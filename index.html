@@ -132,6 +132,11 @@
   .slot.avail-set { background:rgba(45,95,166,.10); }
   .slot.slot-disabled { background:rgba(200,191,168,.12); cursor:default; opacity:.4; }
   .organizer-badge { display:inline-block; background:var(--ink); color:var(--paper); font-size:11px; font-family:'DM Mono',monospace; padding:3px 10px; border-radius:3px; margin-bottom:10px; letter-spacing:.06em; }
+  /* 集計グリッド：入力可能領域 */
+  .slot.res-avail   { box-shadow:inset 0 0 0 1px rgba(45,95,166,.3); }
+  .slot.res-avail.h0 { background:rgba(45,95,166,.07); }
+  /* 集計グリッド：入力不可領域 */
+  .slot.res-unavail { background:rgba(200,191,168,.12) !important; opacity:.4; }
 
   .slot.h0   { background:white; }
   .slot.h1   { background:rgba(58,125,68,.12); }
@@ -186,7 +191,7 @@
   </div>
   <div class="hero">
     <div class="hero-title">日程調整を、<br>もっとシンプルに。</div>
-    <p class="hero-sub">招集者がイベントを作り、参加者が都合を入力するだけ。<br>ログイン不要・社外の方とも共有できます。</p>
+    <p class="hero-sub">主催者がイベントを作り、参加者が都合を入力するだけ。<br>ログイン不要・社外の方とも共有できます。</p>
     <div class="home-actions">
       <button class="btn btn-primary" style="font-size:15px;padding:13px 30px" onclick="showView('view-create')">＋ イベントを作成する</button>
       <button class="btn btn-outline" style="font-size:15px;padding:13px 30px" onclick="showView('view-join-top')">📅 イベントに参加する</button>
@@ -291,13 +296,11 @@
           <button class="btn btn-sm btn-outline" onclick="goToResultView()">📊 集計ページを開く</button>
         </div>
         <hr class="divider" style="margin:14px 0">
-        <p style="font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">PASSWORD（参加者・招集者共通）</p>
+        <p style="font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">PASSWORD（全員共通）</p>
         <div class="link-url" id="share-password"></div>
         <hr class="divider" style="margin:14px 0">
-        <p style="font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">🔑 招集者専用URL（集計ページ直リンク）</p>
-        <div class="link-url" id="share-org-url"></div>
-        <div class="flex-gap">
-          <button class="btn btn-sm btn-ghost" onclick="copyOrgUrl()">📋 招集者URLをコピー</button>
+        <div class="alert alert-info" style="font-size:13px">
+          💡 参加者と同じURLを開き、<strong>「集計を見る」タブ</strong>から集計ページを確認できます。URLは1本で管理できます。
         </div>
       </div>
     </div>
@@ -308,7 +311,7 @@
 <div id="view-join-top" class="view">
   <div class="card">
     <div class="card-title">イベントに参加する <small>JOIN EVENT</small></div>
-    <p class="text-muted" style="margin-bottom:20px">招集者から共有されたイベントIDとパスワードを入力してください。</p>
+    <p class="text-muted" style="margin-bottom:20px">主催者から共有されたURLとパスワードを入力してください。</p>
     <div class="form-group">
       <label>イベントID</label>
       <input type="text" id="j-event-id" placeholder="例：abc12345">
@@ -325,81 +328,88 @@
   </div>
 </div>
 
-<!-- RESPOND VIEW -->
-<div id="view-respond" class="view">
+<!-- EVENT PAGE（入力＋集計 統合ビュー） -->
+<div id="view-event" class="view">
   <div class="event-info-bar">
     <div>
       <div class="ev-title" id="r-title"></div>
       <div class="ev-meta"  id="r-meta"></div>
     </div>
-  </div>
-  <div class="card" style="padding:22px">
-    <div class="form-group">
-      <label>あなたの名前</label>
-      <input type="text" id="r-name" placeholder="ニックネームでもOK">
-    </div>
-    <div class="instructions" id="r-instructions"></div>
-    <div class="legend" id="r-legend"></div>
-    <div class="schedule-nav">
-      <button class="btn btn-outline btn-sm" onclick="prevWeek('r')">← 前の週</button>
-      <div class="schedule-nav-title" id="r-week-label"></div>
-      <button class="btn btn-outline btn-sm" onclick="nextWeek('r')">次の週 →</button>
-    </div>
-    <div class="schedule-wrapper">
-      <div class="schedule-grid" id="r-grid"></div>
-    </div>
-    <p class="text-muted" style="font-size:12px;margin-top:8px;margin-bottom:20px">タップで選択・解除できます。</p>
-    <div id="r-save-error" class="alert alert-error" style="display:none"></div>
-    <button class="btn btn-primary" id="btn-save" style="width:100%;font-size:16px;padding:14px" onclick="submitSaveResponse()">送信する →</button>
-  </div>
-</div>
-
-<!-- RESPOND DONE VIEW -->
-<div id="view-respond-done" class="view">
-  <div class="card" style="text-align:center;padding:48px 32px">
-    <div style="font-size:48px;margin-bottom:16px">✅</div>
-    <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:12px">送信しました！</div>
-    <p style="color:var(--muted);font-size:15px;line-height:1.8;margin-bottom:32px" id="done-msg"></p>
-    <div class="flex-gap" style="justify-content:center">
-      <button class="btn btn-outline" onclick="reDo()">予定を修正する</button>
-      <button class="btn btn-ghost" onclick="goHome()">ホームへ</button>
-    </div>
-  </div>
-</div>
-
-<!-- RESULT VIEW -->
-<div id="view-result" class="view">
-  <div class="event-info-bar">
-    <div>
-      <div class="ev-title" id="res-title"></div>
-      <div class="ev-meta"  id="res-meta"></div>
-    </div>
-    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+    <div style="margin-left:auto">
       <button class="btn btn-sm" style="background:var(--accent2);color:var(--ink);font-weight:700;border-color:transparent" onclick="copyShareUrl()">📋 URLをコピー</button>
-      <button class="btn btn-sm btn-ghost" onclick="loadResultData()">🔄 更新</button>
     </div>
   </div>
-  <div class="card" style="padding:22px">
-    <div class="flex-gap" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:14px">
-      <strong>回答者一覧</strong>
-      <span class="text-muted" id="res-count"></span>
+
+  <!-- タブ切り替え -->
+  <div class="tab-group" style="margin-bottom:20px">
+    <button class="tab-btn active" id="tab-respond" onclick="switchTab('respond')">📝 予定を入力する</button>
+    <button class="tab-btn" id="tab-result" onclick="switchTab('result')">📊 集計を見る</button>
+  </div>
+
+  <!-- 入力パネル -->
+  <div id="panel-respond">
+    <div class="card" style="padding:22px">
+      <div class="form-group">
+        <label>あなたの名前</label>
+        <input type="text" id="r-name" placeholder="ニックネームでもOK">
+      </div>
+      <div class="instructions" id="r-instructions"></div>
+      <div class="legend" id="r-legend"></div>
+      <div class="schedule-nav">
+        <button class="btn btn-outline btn-sm" onclick="prevWeek('r')">← 前の週</button>
+        <div class="schedule-nav-title" id="r-week-label"></div>
+        <button class="btn btn-outline btn-sm" onclick="nextWeek('r')">次の週 →</button>
+      </div>
+      <div class="schedule-wrapper">
+        <div class="schedule-grid" id="r-grid"></div>
+      </div>
+      <p class="text-muted" style="font-size:12px;margin-top:8px;margin-bottom:20px">タップで選択・解除できます。</p>
+      <div id="r-save-error" class="alert alert-error" style="display:none"></div>
+      <button class="btn btn-primary" id="btn-save" style="width:100%;font-size:16px;padding:14px" onclick="submitSaveResponse()">送信する →</button>
     </div>
-    <div class="respondent-tags" id="res-respondents"></div>
-    <p class="text-muted" style="font-size:12px;margin-top:6px">名前をクリックするとその人の回答のみ表示（複数選択可）。</p>
-    <hr class="divider">
-    <div class="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:rgba(58,125,68,.9)"></div>全員OK</div>
-      <div class="legend-item"><div class="legend-dot" style="background:rgba(58,125,68,.45)"></div>一部OK</div>
-      <div class="legend-item"><div class="legend-dot" style="background:white;border-color:var(--border)"></div>なし</div>
+  </div>
+
+  <!-- 送信完了パネル -->
+  <div id="panel-done" style="display:none">
+    <div class="card" style="text-align:center;padding:48px 32px">
+      <div style="font-size:48px;margin-bottom:16px">✅</div>
+      <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:12px">送信しました！</div>
+      <p style="color:var(--muted);font-size:15px;line-height:1.8;margin-bottom:32px" id="done-msg"></p>
+      <div class="flex-gap" style="justify-content:center">
+        <button class="btn btn-outline" onclick="reDo()">予定を修正する</button>
+        <button class="btn btn-ghost" onclick="switchTab('result')">集計を見る →</button>
+      </div>
     </div>
-    <div class="schedule-nav">
-      <button class="btn btn-outline btn-sm" onclick="prevWeek('res')">← 前の週</button>
-      <div class="schedule-nav-title" id="res-week-label"></div>
-      <button class="btn btn-outline btn-sm" onclick="nextWeek('res')">次の週 →</button>
-    </div>
-    <div id="res-loading" class="loading-overlay" style="display:none"><div class="loading"></div>読み込み中…</div>
-    <div class="schedule-wrapper">
-      <div class="schedule-grid" id="res-grid"></div>
+  </div>
+
+  <!-- 集計パネル -->
+  <div id="panel-result" style="display:none">
+    <div class="card" style="padding:22px">
+      <div class="flex-gap" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:14px">
+        <strong>回答者一覧</strong>
+        <div class="flex-gap">
+          <span class="text-muted" id="res-count"></span>
+          <button class="btn btn-sm btn-ghost" onclick="loadResultData()">🔄 更新</button>
+        </div>
+      </div>
+      <div class="respondent-tags" id="res-respondents"></div>
+      <p class="text-muted" style="font-size:12px;margin-top:6px">名前をクリックするとその人の回答のみ表示（複数選択可）。</p>
+      <hr class="divider">
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(45,95,166,.2);border:1.5px solid rgba(45,95,166,.5)"></div>入力可能時間帯</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(58,125,68,.9)"></div>全員OK</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(58,125,68,.45)"></div>一部OK</div>
+        <div class="legend-item"><div class="legend-dot" style="background:white;border-color:var(--border)"></div>回答なし</div>
+      </div>
+      <div class="schedule-nav">
+        <button class="btn btn-outline btn-sm" onclick="prevWeek('res')">← 前の週</button>
+        <div class="schedule-nav-title" id="res-week-label"></div>
+        <button class="btn btn-outline btn-sm" onclick="nextWeek('res')">次の週 →</button>
+      </div>
+      <div id="res-loading" class="loading-overlay" style="display:none"><div class="loading"></div>読み込み中…</div>
+      <div class="schedule-wrapper">
+        <div class="schedule-grid" id="res-grid"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -554,6 +564,16 @@ function goHome() {
   respondentFilter=[]; draftSlots={}; allResponses=[];
   showView('view-home');
 }
+
+// イベントページのタブ切り替え
+function switchTab(tab) {
+  document.getElementById('panel-respond').style.display = tab==='respond' ? 'block' : 'none';
+  document.getElementById('panel-done').style.display    = 'none';
+  document.getElementById('panel-result').style.display  = tab==='result'  ? 'block' : 'none';
+  document.getElementById('tab-respond').classList.toggle('active', tab==='respond');
+  document.getElementById('tab-result').classList.toggle('active',  tab==='result');
+  if(tab==='result') loadResultData();
+}
 function buildUrl(id) { return `${location.origin}${location.pathname}?event=${id}`; }
 function copyShareUrl() {
   const url = currentEvent ? buildUrl(currentEvent.id) : document.getElementById('share-url').textContent;
@@ -561,7 +581,7 @@ function copyShareUrl() {
 }
 function copyOrgUrl() {
   const url = currentEvent ? buildOrganizerUrl(currentEvent.id) : document.getElementById('share-org-url').textContent;
-  navigator.clipboard.writeText(url).then(()=>alert('招集者URLをコピーしました！'));
+  navigator.clipboard.writeText(url).then(()=>alert('集計URLをコピーしました！'));
 }
 
 // ================================================================
@@ -658,7 +678,7 @@ async function submitCreateEvent() {
     currentEvent = { id, organizer, title, desc, duration, password, inputMode, dates, available_slots: hasSetup2 ? setupSlots : null };
     document.getElementById('share-url').textContent      = buildUrl(id);
     document.getElementById('share-password').textContent = password;
-    document.getElementById('share-org-url').textContent  = buildOrganizerUrl(id);
+    document.getElementById('share-org-url').textContent  = buildUrl(id) + ' （同じURL・集計タブから確認）';
     document.getElementById('view-created').style.display = 'block';
     document.getElementById('view-created').scrollIntoView({behavior:'smooth'});
   } catch(e) {
@@ -668,7 +688,7 @@ async function submitCreateEvent() {
     setLoading('btn-create', false);
   }
 }
-function goToResultView() { if(currentEvent) openResultView(currentEvent); }
+function goToResultView() { if(currentEvent) openEventPage(currentEvent, 'result'); }
 
 // ================================================================
 //  イベント参加
@@ -718,11 +738,8 @@ async function checkUrlParams() {
     const ev = await sb.getEvent(eventId);
     if(!ev){ document.getElementById('j-event-id').value=eventId; showView('view-join-top'); return; }
     currentEvent = normalizeEv(ev);
-    if(isOrganizer){
-      pendingAfterPw = ()=>openResultView(currentEvent);
-    } else {
-      pendingAfterPw = ()=>openRespondView(currentEvent);
-    }
+    // URLは1本。全員同じページに入り、タブで切り替え
+    pendingAfterPw = ()=>openEventPage(currentEvent, 'respond');
     openModal();
   } catch(e) {
     document.getElementById('j-event-id').value = eventId;
@@ -750,20 +767,20 @@ function confirmModalPw() {
 }
 
 // ================================================================
-//  回答ビュー
+//  イベントページ（入力＋集計 統合）
 // ================================================================
-async function openRespondView(ev) {
-  currentWeekR=0; draftSlots={};
+async function openEventPage(ev, startTab='respond') {
+  currentWeekR=0; currentWeekRes=0; draftSlots={};
   document.getElementById('r-title').textContent = ev.title;
-  document.getElementById('r-meta').textContent  = `主催：${ev.organizer} ／ 所要時間：${DUR_LABEL[ev.duration]||''} ／ ID：${ev.id}`;
+  document.getElementById('r-meta').textContent  = `主催者：${ev.organizer} ／ 所要時間：${DUR_LABEL[ev.duration]||''} ／ ID：${ev.id}`;
   document.getElementById('r-instructions').textContent = ev.inputMode==='good'
-    ? '✅ 参加可能な時間帯をクリック・ドラッグで選択してください。再クリックで解除できます。'
-    : '❌ 参加できない時間帯をクリック・ドラッグで選択してください。再クリックで解除できます。';
+    ? '✅ 参加可能な時間帯をクリックして選択してください。もう一度クリックで解除できます。'
+    : '❌ 参加できない時間帯をクリックして選択してください。もう一度クリックで解除できます。';
   document.getElementById('r-legend').innerHTML = ev.inputMode==='good'
-    ? `<div class="legend-item"><div class="legend-dot" style="background:rgba(58,125,68,.22)"></div>参加可能</div>`
-    : `<div class="legend-item"><div class="legend-dot" style="background:rgba(200,75,49,.18)"></div>参加不可</div>`;
+    ? `<div class="legend-item"><div class="legend-dot" style="background:rgba(58,125,68,.28);box-shadow:inset 0 0 0 1.5px rgba(58,125,68,.6)"></div>参加可能</div>`
+    : `<div class="legend-item"><div class="legend-dot" style="background:rgba(200,75,49,.22);box-shadow:inset 0 0 0 1.5px rgba(200,75,49,.6)"></div>参加不可</div>`;
 
-  const savedName = localStorage.getItem('choseiName_'+ev.id)||'';
+  const savedName = localStorage.getItem('apointName_'+ev.id)||'';
   document.getElementById('r-name').value = savedName;
   if(savedName){
     try {
@@ -773,9 +790,21 @@ async function openRespondView(ev) {
   }
 
   document.getElementById('r-save-error').style.display = 'none';
+  document.getElementById('panel-done').style.display = 'none';
   renderGrid('r');
-  showView('view-respond');
+
+  // タブ初期表示
+  document.getElementById('panel-respond').style.display = startTab==='respond' ? 'block' : 'none';
+  document.getElementById('panel-result').style.display  = startTab==='result'  ? 'block' : 'none';
+  document.getElementById('tab-respond').classList.toggle('active', startTab==='respond');
+  document.getElementById('tab-result').classList.toggle('active',  startTab==='result');
+  if(startTab==='result') loadResultData();
+
+  showView('view-event');
 }
+
+// 後方互換（既存呼び出し箇所）
+async function openRespondView(ev) { return openEventPage(ev, 'respond'); }
 
 // ================================================================
 //  回答保存 → 完了ページへ遷移
@@ -791,11 +820,17 @@ async function submitSaveResponse() {
   try {
     await sb.upsertResponse({ event_id:ev.id, name, slots:draftSlots });
     localStorage.setItem('choseiName_'+ev.id, name);
-    // 完了ページへ
+    // 完了パネルへ切り替え
+    localStorage.setItem('apointName_'+ev.id, name);
     const modeText = ev.inputMode==='good' ? '参加可能な時間帯' : '参加不可な時間帯';
     document.getElementById('done-msg').innerHTML =
-      `<strong>${name}</strong> さんの${modeText}を開催者に送信しました。<br>開催者からの連絡をお待ちください。`;
-    showView('view-respond-done');
+      `<strong>${name}</strong> さんの${modeText}を主催者に送信しました。<br>主催者からの連絡をお待ちください。`;
+    document.getElementById('panel-respond').style.display = 'none';
+    document.getElementById('panel-result').style.display  = 'none';
+    document.getElementById('panel-done').style.display    = 'block';
+    document.getElementById('tab-respond').classList.remove('active');
+    document.getElementById('tab-result').classList.remove('active');
+    window.scrollTo(0,0);
   } catch(e) {
     errEl.textContent='送信に失敗しました: '+e.message; errEl.style.display='block';
   } finally {
@@ -803,12 +838,11 @@ async function submitSaveResponse() {
   }
 }
 
-// 完了ページから「予定を修正する」
+// 完了パネルから「予定を修正する」
 async function reDo() {
   const ev = currentEvent;
   if(!ev) return;
-  // 既存回答を再ロード
-  const name = localStorage.getItem('choseiName_'+ev.id)||'';
+  const name = localStorage.getItem('apointName_'+ev.id)||'';
   draftSlots = {};
   if(name){
     try {
@@ -817,21 +851,23 @@ async function reDo() {
     } catch(_){}
   }
   renderGrid('r');
-  showView('view-respond');
+  document.getElementById('panel-done').style.display    = 'none';
+  document.getElementById('panel-respond').style.display = 'block';
+  document.getElementById('panel-result').style.display  = 'none';
+  document.getElementById('tab-respond').classList.add('active');
+  document.getElementById('tab-result').classList.remove('active');
+  window.scrollTo(0,0);
 }
 
 // ================================================================
-//  集計ビュー
+//  集計ビュー（統合ページへリダイレクト）
 // ================================================================
 async function openResultView(ev) {
-  currentWeekRes=0; respondentFilter=[];
-  document.getElementById('res-title').textContent = ev.title;
-  document.getElementById('res-meta').textContent  = `主催：${ev.organizer} ／ 所要時間：${DUR_LABEL[ev.duration]||''} ／ ID：${ev.id}`;
-  await loadResultData();
-  showView('view-result');
+  return openEventPage(ev, 'result');
 }
 
 async function loadResultData() {
+  respondentFilter=[];
   document.getElementById('res-loading').style.display='flex';
   try {
     const rows = await sb.getResponses(currentEvent.id);
@@ -900,6 +936,10 @@ function renderGrid(mode) {
           ontouchstart="onTS(event)" ontouchmove="onTM(event)" ontouchend="onTE(event)"
         ></div>`;
       } else {
+        // 入力可能領域チェック
+        const avail = ev.available_slots;
+        const isAvail = !avail || Object.keys(avail).length===0 || avail[key];
+
         const active = respondentFilter.length>0 ? respondentFilter : allResponses.map(r=>r.name);
         const total  = active.length;
         let ok=0;
@@ -919,8 +959,10 @@ function renderGrid(mode) {
           else if(ratio>=.2) hCls='h2';
           else if(ratio>0)   hCls='h1';
         }
+        // 入力可能領域は薄青枠で強調、それ以外は薄グレー
+        const availCls = isAvail ? ' res-avail' : ' res-unavail';
         const inner = ok>0 ? `<span class="slot-cnt">${ok}</span>` : '';
-        html += `<div class="${cls} ${hCls}">${inner}</div>`;
+        html += `<div class="${cls} ${hCls}${availCls}">${inner}</div>`;
       }
     });
   });
@@ -995,7 +1037,7 @@ function applySlot(key) {
 }
 
 // ================================================================
-//  セットアップグリッド（招集者が選択可能時間帯を設定）
+//  セットアップグリッド（主催者が選択可能時間帯を設定）
 // ================================================================
 function initSetupGrid() {
   setupSlots = {};
@@ -1077,7 +1119,7 @@ function setupClearAll() {
 }
 
 // ================================================================
-//  招集者専用ページ：URLパラメータ ?event=xxx&organizer=1 でアクセス
+//  主催者ページ：URLパラメータ ?event=xxx&organizer=1 でアクセス
 // ================================================================
 function buildOrganizerUrl(id) {
   return `${location.origin}${location.pathname}?event=${id}&organizer=1`;
