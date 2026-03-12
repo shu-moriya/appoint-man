@@ -125,9 +125,12 @@
 
   .slot { min-height:26px; border-right:1px solid rgba(200,191,168,.35); border-bottom:1px dotted rgba(200,191,168,.35); cursor:pointer; transition:background .08s; position:relative; touch-action:none; }
   .slot.h-start { border-top:1px solid rgba(200,191,168,.5); }
-  .slot:hover { background:rgba(232,168,56,.18) !important; }
+  .slot:hover:not(.slot-disabled) { background:rgba(232,168,56,.18) !important; }
   .slot.sel-good { background:rgba(58,125,68,.22); }
   .slot.sel-bad  { background:rgba(200,75,49,.18); }
+  .slot.avail-set { background:rgba(45,95,166,.13); }
+  .slot.slot-disabled { background:rgba(200,191,168,.15); cursor:not-allowed; opacity:.5; }
+  .organizer-badge { display:inline-block; background:var(--ink); color:var(--paper); font-size:11px; font-family:'DM Mono',monospace; padding:3px 10px; border-radius:3px; margin-bottom:10px; letter-spacing:.06em; }
 
   .slot.h0   { background:white; }
   .slot.h1   { background:rgba(58,125,68,.12); }
@@ -251,6 +254,23 @@
       <div id="candidate-list" class="candidate-list"></div>
       <p class="text-muted" style="margin-top:8px;font-size:12px">※ 候補日未設定の場合、今日から2週間分が表示されます。</p>
     </div>
+    <hr class="divider">
+    <div class="form-group">
+      <label>選択可能な時間帯を設定（任意）</label>
+      <p class="text-muted" style="margin-bottom:10px;font-size:12px">参加者が選択できる時間帯を絞り込めます。クリック・ドラッグで青くした時間帯のみ参加者が選択できます。未設定の場合はすべての時間帯が選択可能です。</p>
+      <div class="schedule-nav" style="margin-bottom:8px">
+        <button class="btn btn-outline btn-sm" onclick="prevWeekSetup()">← 前の週</button>
+        <div class="schedule-nav-title" id="setup-week-label"></div>
+        <button class="btn btn-outline btn-sm" onclick="nextWeekSetup()">次の週 →</button>
+      </div>
+      <div class="schedule-wrapper">
+        <div class="schedule-grid" id="setup-grid"></div>
+      </div>
+      <div class="flex-gap" style="margin-top:10px">
+        <button class="btn btn-ghost btn-sm" onclick="setupSelectAll()">すべて選択</button>
+        <button class="btn btn-ghost btn-sm" onclick="setupClearAll()">すべてクリア</button>
+      </div>
+    </div>
     <div id="create-error" class="alert alert-error" style="display:none"></div>
     <div class="flex-gap">
       <button class="btn btn-primary" id="btn-create" onclick="submitCreateEvent()">イベントを作成する →</button>
@@ -266,12 +286,18 @@
         <p style="font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">SHARE URL</p>
         <div class="link-url" id="share-url"></div>
         <div class="flex-gap">
-          <button class="btn btn-sm btn-primary" onclick="copyShareUrl()">📋 URLをコピー</button>
+          <button class="btn btn-sm btn-primary" onclick="copyShareUrl()">📋 参加者URLをコピー</button>
           <button class="btn btn-sm btn-outline" onclick="goToResultView()">📊 集計ページを開く</button>
         </div>
         <hr class="divider" style="margin:14px 0">
-        <p style="font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">PASSWORD</p>
+        <p style="font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">PASSWORD（参加者・招集者共通）</p>
         <div class="link-url" id="share-password"></div>
+        <hr class="divider" style="margin:14px 0">
+        <p style="font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">🔑 招集者専用URL（集計ページ直リンク）</p>
+        <div class="link-url" id="share-org-url"></div>
+        <div class="flex-gap">
+          <button class="btn btn-sm btn-ghost" onclick="copyOrgUrl()">📋 招集者URLをコピー</button>
+        </div>
       </div>
     </div>
   </div>
@@ -387,8 +413,8 @@
 // ================================================================
 //  ★ SUPABASE 設定 — ここを書き換えてください
 // ================================================================
-const SUPABASE_URL = 'https://qjzggxpctivhsbdhorqi.supabase.co';    // 例: https://xxxxxxxx.supabase.co
-const SUPABASE_KEY = 'sb_publishable_LmJ1t2OKsZswV_pimO_kWg_rOcg9QwT'; // anon/public キー
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';    // 例: https://xxxxxxxx.supabase.co
+const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY'; // anon/public キー
 
 // ================================================================
 //  Supabase REST ラッパー（supabase-js 不要、fetch のみ）
@@ -427,7 +453,13 @@ const sb = {
     return await this.get(`responses?event_id=eq.${encodeURIComponent(eventId)}&select=*`) || [];
   },
   async upsertResponse(data) {
-    return await this.post('responses', data, 'resolution=merge-duplicates,return=representation');
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/responses`, {
+      method: 'POST',
+      headers: { ...this.h(), 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(data)
+    });
+    if (!r.ok) throw new Error(await r.text());
+    return r.status === 204 ? null : r.json();
   }
 };
 
@@ -450,6 +482,11 @@ const RESP_COLORS = ['#e57373','#64b5f6','#81c784','#ffb74d','#ba68c8','#4db6ac'
 let isDragging   = false;
 let dragValue    = null;
 let touchedSlots = new Set();
+
+// 招集者が設定する選択可能時間帯 { slotKey: true }
+let setupSlots   = {};
+let setupWeek    = 0;
+let setupDates   = []; // 候補日（設定グリッド用）
 
 // ================================================================
 //  ユーティリティ
@@ -497,7 +534,11 @@ function goHome() {
 function buildUrl(id) { return `${location.origin}${location.pathname}?event=${id}`; }
 function copyShareUrl() {
   const url = currentEvent ? buildUrl(currentEvent.id) : document.getElementById('share-url').textContent;
-  navigator.clipboard.writeText(url).then(()=>alert('URLをコピーしました！'));
+  navigator.clipboard.writeText(url).then(()=>alert('参加者URLをコピーしました！'));
+}
+function copyOrgUrl() {
+  const url = currentEvent ? buildOrganizerUrl(currentEvent.id) : document.getElementById('share-org-url').textContent;
+  navigator.clipboard.writeText(url).then(()=>alert('招集者URLをコピーしました！'));
 }
 
 // ================================================================
@@ -508,6 +549,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
   const today = formatDate(new Date());
   document.getElementById('c-date-from').value = today;
   document.getElementById('c-date-to').value   = addDays(today,6);
+  initSetupGrid();
   checkUrlParams();
 });
 
@@ -544,6 +586,13 @@ function renderCandidateList() {
     const {label,wd} = dateLabel(d);
     return `<div class="candidate-tag">${label}（${wd}）<button onclick="removeCandidate('${d}')">×</button></div>`;
   }).join('');
+  // 候補日が変わったらセットアップグリッドも再描画
+  setupDates = [...candidateDates];
+  if(setupDates.length===0){
+    const today = formatDate(new Date());
+    for(let i=0;i<14;i++) setupDates.push(addDays(today,i));
+  }
+  renderSetupGrid();
 }
 
 // ================================================================
@@ -573,14 +622,18 @@ async function submitCreateEvent() {
   }
 
   const id = genId();
-  const payload = { id, organizer, title, description: desc, duration, password, input_mode: inputMode, dates: dates.join(',') };
+  // 選択可能スロット: 空なら全スロット許可（null保存）
+  const hasSetup = Object.keys(setupSlots).length > 0;
+  const payload = { id, organizer, title, description: desc, duration, password, input_mode: inputMode, dates: dates.join(','), available_slots: hasSetup ? setupSlots : null };
 
   setLoading('btn-create', true);
   try {
     await sb.insertEvent(payload);
-    currentEvent = { id, organizer, title, desc, duration, password, inputMode, dates };
+    const hasSetup2 = Object.keys(setupSlots).length > 0;
+    currentEvent = { id, organizer, title, desc, duration, password, inputMode, dates, available_slots: hasSetup2 ? setupSlots : null };
     document.getElementById('share-url').textContent      = buildUrl(id);
     document.getElementById('share-password').textContent = password;
+    document.getElementById('share-org-url').textContent  = buildOrganizerUrl(id);
     document.getElementById('view-created').style.display = 'block';
     document.getElementById('view-created').scrollIntoView({behavior:'smooth'});
   } catch(e) {
@@ -619,6 +672,8 @@ async function submitJoin() {
 function normalizeEv(ev) {
   if(typeof ev.dates==='string') ev.dates = ev.dates.split(',');
   ev.inputMode = ev.input_mode || ev.inputMode || 'good';
+  // available_slots: null or object
+  if(ev.available_slots === undefined) ev.available_slots = null;
   return ev;
 }
 
@@ -626,8 +681,9 @@ function normalizeEv(ev) {
 //  URLルーティング
 // ================================================================
 async function checkUrlParams() {
-  const params  = new URLSearchParams(location.search);
-  const eventId = params.get('event');
+  const params     = new URLSearchParams(location.search);
+  const eventId    = params.get('event');
+  const isOrganizer = params.get('organizer') === '1';
   if(!eventId) return;
   if(!isConfigured()){
     document.getElementById('j-event-id').value = eventId;
@@ -637,7 +693,11 @@ async function checkUrlParams() {
     const ev = await sb.getEvent(eventId);
     if(!ev){ document.getElementById('j-event-id').value=eventId; showView('view-join-top'); return; }
     currentEvent = normalizeEv(ev);
-    pendingAfterPw = ()=>openRespondView(currentEvent);
+    if(isOrganizer){
+      pendingAfterPw = ()=>openResultView(currentEvent);
+    } else {
+      pendingAfterPw = ()=>openRespondView(currentEvent);
+    }
     openModal();
   } catch(e) {
     document.getElementById('j-event-id').value = eventId;
@@ -782,11 +842,17 @@ function renderGrid(mode) {
       let cls = `slot${isH?' h-start':''}`;
       if(mode==='r'){
         const v = draftSlots[key];
-        if(ev.inputMode==='good'&&v===true) cls+=' sel-good';
-        if(ev.inputMode==='bad' &&v===true) cls+=' sel-bad';
-        html += `<div class="${cls}" data-key="${key}"
+        // 選択可能スロット制限チェック
+        const avail = ev.available_slots;
+        const isDisabled = avail && Object.keys(avail).length > 0 && !avail[key];
+        if(isDisabled) cls+=' slot-disabled';
+        else {
+          if(ev.inputMode==='good'&&v===true) cls+=' sel-good';
+          if(ev.inputMode==='bad' &&v===true) cls+=' sel-bad';
+        }
+        html += `<div class="${cls}" data-key="${key}" data-disabled="${isDisabled?'1':''}"
           onmousedown="onMD(event)" onmouseover="onMO(event)"
-          ontouchstart="onTS(event)" ontouchmove="onTM(event)" ontouchend="onTE()"
+          ontouchstart="onTS(event)" ontouchmove="onTM(event)" ontouchend="onTE(event)"
         ></div>`;
       } else {
         const active = respondentFilter.length>0 ? respondentFilter : allResponses.map(r=>r.name);
@@ -824,32 +890,40 @@ function renderGrid(mode) {
 // ================================================================
 function onMD(e) {
   e.preventDefault();
-  const key = e.currentTarget.dataset.key;
+  const el = e.currentTarget;
+  if(el.dataset.disabled==='1') return;
+  const key = el.dataset.key;
   isDragging=true; dragValue=draftSlots[key]!==true;
   touchedSlots=new Set([key]); applySlot(key);
 }
 function onMO(e) {
   if(!isDragging) return;
-  const key = e.currentTarget.dataset.key;
+  const el = e.currentTarget;
+  if(el.dataset.disabled==='1') return;
+  const key = el.dataset.key;
   if(!touchedSlots.has(key)){ touchedSlots.add(key); applySlot(key); }
 }
 document.addEventListener('mouseup', ()=>{ isDragging=false; touchedSlots.clear(); });
 
 // ================================================================
-//  ドラッグ選択（タッチ）
+//  タッチ操作（シングルタップのみ：タップで切り替え）
 // ================================================================
 function onTS(e) {
-  const el = e.currentTarget; const key = el.dataset.key;
-  isDragging=true; dragValue=draftSlots[key]!==true;
-  touchedSlots=new Set([key]); applySlot(key);
+  // タッチ開始時は何もしない（移動か単タップか判断待ち）
+  e.currentTarget._touchMoved = false;
 }
 function onTM(e) {
-  if(!isDragging) return; e.preventDefault();
-  const t=e.touches[0];
-  const el=document.elementFromPoint(t.clientX,t.clientY);
-  if(el&&el.dataset.key&&!touchedSlots.has(el.dataset.key)){ touchedSlots.add(el.dataset.key); applySlot(el.dataset.key); }
+  // 指が動いたらスクロール扱い（選択しない）
+  e.currentTarget._touchMoved = true;
 }
-function onTE() { isDragging=false; touchedSlots.clear(); }
+function onTE(e) {
+  const el = e.currentTarget;
+  if(el._touchMoved) return; // スクロール中は無視
+  const key = el.dataset.key;
+  if(!key) return;
+  dragValue = draftSlots[key] !== true;
+  applySlot(key);
+}
 
 function applySlot(key) {
   draftSlots[key] = dragValue;
@@ -861,6 +935,95 @@ function applySlot(key) {
     if(mode==='good') el.classList.add('sel-good');
     else              el.classList.add('sel-bad');
   }
+}
+
+// ================================================================
+//  セットアップグリッド（招集者が選択可能時間帯を設定）
+// ================================================================
+function initSetupGrid() {
+  setupSlots = {};
+  setupWeek  = 0;
+  setupDates = candidateDates.length > 0 ? [...candidateDates] : (() => {
+    const today = formatDate(new Date());
+    const d = [];
+    for(let i=0;i<14;i++) d.push(addDays(today,i));
+    return d;
+  })();
+  renderSetupGrid();
+}
+
+function renderSetupGrid() {
+  const gridEl = document.getElementById('setup-grid');
+  if(!gridEl) return;
+  const dates = setupDates.slice(setupWeek*7, setupWeek*7+7);
+  if(!dates.length){ gridEl.innerHTML=''; return; }
+  gridEl.style.gridTemplateColumns = `52px repeat(${dates.length},1fr)`;
+
+  let html = `<div class="time-col-header">時刻</div>`;
+  dates.forEach(d=>{
+    const {label,wd,wdNum} = dateLabel(d);
+    const cls = wdNum===0?'sun':wdNum===6?'sat':'';
+    html += `<div class="day-header ${cls}">${label}<br><span class="wd">${wd}</span></div>`;
+  });
+  SLOTS.forEach(slot=>{
+    const isH = slot.endsWith(':00');
+    html += `<div class="time-label${isH?' h-start':''}">${slot}</div>`;
+    dates.forEach(d=>{
+      const key = `${d}_${slot}`;
+      const sel = setupSlots[key] ? ' avail-set' : '';
+      html += `<div class="slot${isH?' h-start':''}${sel}" data-key="${key}"
+        onmousedown="setupMD(event)" onmouseover="setupMO(event)"
+        ontouchstart="onTS(event)" ontouchmove="onTM(event)" ontouchend="setupTE(event)"
+      ></div>`;
+    });
+  });
+  gridEl.innerHTML = html;
+  const lbl = `${dateLabel(dates[0]).label} 〜 ${dateLabel(dates[dates.length-1]).label}`;
+  document.getElementById('setup-week-label').textContent = lbl;
+}
+
+let setupDragging=false, setupDragVal=null, setupTouched=new Set();
+function setupMD(e) {
+  e.preventDefault();
+  const key=e.currentTarget.dataset.key;
+  setupDragging=true; setupDragVal=!setupSlots[key];
+  setupTouched=new Set([key]); applySetupSlot(key);
+}
+function setupMO(e) {
+  if(!setupDragging) return;
+  const key=e.currentTarget.dataset.key;
+  if(!setupTouched.has(key)){ setupTouched.add(key); applySetupSlot(key); }
+}
+function setupTE(e) {
+  const el=e.currentTarget;
+  if(el._touchMoved) return;
+  const key=el.dataset.key;
+  setupDragVal=!setupSlots[key]; applySetupSlot(key);
+}
+document.addEventListener('mouseup',()=>{ setupDragging=false; setupTouched.clear(); });
+function applySetupSlot(key) {
+  if(setupDragVal) setupSlots[key]=true; else delete setupSlots[key];
+  const el=document.querySelector(`#setup-grid [data-key="${key}"]`);
+  if(el){ el.classList.toggle('avail-set', !!setupDragVal); }
+}
+function prevWeekSetup() { if(setupWeek>0){ setupWeek--; renderSetupGrid(); } }
+function nextWeekSetup() { if((setupWeek+1)*7<setupDates.length){ setupWeek++; renderSetupGrid(); } }
+function setupSelectAll() {
+  const dates=setupDates.slice(setupWeek*7,setupWeek*7+7);
+  dates.forEach(d=>SLOTS.forEach(s=>{ setupSlots[`${d}_${s}`]=true; }));
+  renderSetupGrid();
+}
+function setupClearAll() {
+  const dates=setupDates.slice(setupWeek*7,setupWeek*7+7);
+  dates.forEach(d=>SLOTS.forEach(s=>{ delete setupSlots[`${d}_${s}`]; }));
+  renderSetupGrid();
+}
+
+// ================================================================
+//  招集者専用ページ：URLパラメータ ?event=xxx&organizer=1 でアクセス
+// ================================================================
+function buildOrganizerUrl(id) {
+  return `${location.origin}${location.pathname}?event=${id}&organizer=1`;
 }
 
 // ================================================================
