@@ -126,6 +126,7 @@
   .slot { min-height:26px; border-right:1px solid rgba(200,191,168,.35); border-bottom:1px dotted rgba(200,191,168,.35); cursor:pointer; transition:background .08s; position:relative; touch-action:none; }
   .slot.h-start { border-top:1px solid rgba(200,191,168,.5); }
   .slot:hover:not(.slot-disabled) { background:rgba(232,168,56,.18) !important; }
+  .touch-device .slot:hover { background:none !important; }
   .slot.sel-good { background:rgba(58,125,68,.22); }
   .slot.sel-bad  { background:rgba(200,75,49,.18); }
   .slot.avail-set { background:rgba(45,95,166,.13); }
@@ -333,16 +334,11 @@
     </div>
   </div>
   <div class="card" style="padding:22px">
-    <div class="instructions" id="r-instructions"></div>
-    <div class="name-row">
-      <div>
-        <label>あなたの名前</label>
-        <input type="text" id="r-name" placeholder="ニックネームでもOK">
-      </div>
-      <button class="btn btn-primary" id="btn-save" onclick="submitSaveResponse()">保存する</button>
+    <div class="form-group">
+      <label>あなたの名前</label>
+      <input type="text" id="r-name" placeholder="ニックネームでもOK">
     </div>
-    <div id="r-saved-msg"  class="alert alert-success" style="display:none">✅ 回答を保存しました！</div>
-    <div id="r-save-error" class="alert alert-error"   style="display:none"></div>
+    <div class="instructions" id="r-instructions"></div>
     <div class="legend" id="r-legend"></div>
     <div class="schedule-nav">
       <button class="btn btn-outline btn-sm" onclick="prevWeek('r')">← 前の週</button>
@@ -352,7 +348,22 @@
     <div class="schedule-wrapper">
       <div class="schedule-grid" id="r-grid"></div>
     </div>
-    <p class="text-muted" style="font-size:12px;margin-top:8px">クリック・ドラッグまたはタップで連続選択できます。再クリックで解除。</p>
+    <p class="text-muted" style="font-size:12px;margin-top:8px;margin-bottom:20px">タップで選択・解除できます。</p>
+    <div id="r-save-error" class="alert alert-error" style="display:none"></div>
+    <button class="btn btn-primary" id="btn-save" style="width:100%;font-size:16px;padding:14px" onclick="submitSaveResponse()">送信する →</button>
+  </div>
+</div>
+
+<!-- RESPOND DONE VIEW -->
+<div id="view-respond-done" class="view">
+  <div class="card" style="text-align:center;padding:48px 32px">
+    <div style="font-size:48px;margin-bottom:16px">✅</div>
+    <div style="font-family:'Playfair Display',serif;font-size:22px;margin-bottom:12px">送信しました！</div>
+    <p style="color:var(--muted);font-size:15px;line-height:1.8;margin-bottom:32px" id="done-msg"></p>
+    <div class="flex-gap" style="justify-content:center">
+      <button class="btn btn-outline" onclick="reDo()">予定を修正する</button>
+      <button class="btn btn-ghost" onclick="goHome()">ホームへ</button>
+    </div>
   </div>
 </div>
 
@@ -453,13 +464,26 @@ const sb = {
     return await this.get(`responses?event_id=eq.${encodeURIComponent(eventId)}&select=*`) || [];
   },
   async upsertResponse(data) {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/responses`, {
-      method: 'POST',
-      headers: { ...this.h(), 'Prefer': 'resolution=merge-duplicates,return=representation' },
-      body: JSON.stringify(data)
-    });
-    if (!r.ok) throw new Error(await r.text());
-    return r.status === 204 ? null : r.json();
+    // まず既存レコードを確認してPATCH or POST を使い分ける
+    const exists = await this.get(
+      `responses?event_id=eq.${encodeURIComponent(data.event_id)}&name=eq.${encodeURIComponent(data.name)}&select=id`
+    );
+    if(exists && exists.length > 0) {
+      // 既存あり → PATCH（上書き）
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/responses?event_id=eq.${encodeURIComponent(data.event_id)}&name=eq.${encodeURIComponent(data.name)}`,
+        { method:'PATCH', headers:{...this.h(),'Prefer':'return=representation'}, body:JSON.stringify({slots:data.slots}) }
+      );
+      if(!r.ok) throw new Error(await r.text());
+      return r.status===204 ? null : r.json();
+    } else {
+      // 新規 → POST
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/responses`, {
+        method:'POST', headers:{...this.h(),'Prefer':'return=representation'}, body:JSON.stringify(data)
+      });
+      if(!r.ok) throw new Error(await r.text());
+      return r.status===204 ? null : r.json();
+    }
   }
 };
 
@@ -551,6 +575,8 @@ window.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('c-date-to').value   = addDays(today,6);
   initSetupGrid();
   checkUrlParams();
+  // タッチデバイスではhoverを無効化
+  window.addEventListener('touchstart', ()=>{ document.body.classList.add('touch-device'); }, {once:true});
 });
 
 // ================================================================
@@ -747,34 +773,52 @@ async function openRespondView(ev) {
     } catch(_){}
   }
 
-  document.getElementById('r-saved-msg').style.display  = 'none';
   document.getElementById('r-save-error').style.display = 'none';
   renderGrid('r');
   showView('view-respond');
 }
 
 // ================================================================
-//  回答保存
+//  回答保存 → 完了ページへ遷移
 // ================================================================
 async function submitSaveResponse() {
   const ev   = currentEvent;
   const name = document.getElementById('r-name').value.trim();
-  const msgEl = document.getElementById('r-saved-msg');
   const errEl = document.getElementById('r-save-error');
-  msgEl.style.display = errEl.style.display = 'none';
+  errEl.style.display = 'none';
   if(!name){ errEl.textContent='名前を入力してください'; errEl.style.display='block'; return; }
 
   setLoading('btn-save', true);
   try {
     await sb.upsertResponse({ event_id:ev.id, name, slots:draftSlots });
     localStorage.setItem('choseiName_'+ev.id, name);
-    msgEl.style.display='block';
-    msgEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+    // 完了ページへ
+    const modeText = ev.inputMode==='good' ? '参加可能な時間帯' : '参加不可な時間帯';
+    document.getElementById('done-msg').innerHTML =
+      `<strong>${name}</strong> さんの${modeText}を開催者に送信しました。<br>開催者からの連絡をお待ちください。`;
+    showView('view-respond-done');
   } catch(e) {
-    errEl.textContent='保存に失敗しました: '+e.message; errEl.style.display='block';
+    errEl.textContent='送信に失敗しました: '+e.message; errEl.style.display='block';
   } finally {
     setLoading('btn-save', false);
   }
+}
+
+// 完了ページから「予定を修正する」
+async function reDo() {
+  const ev = currentEvent;
+  if(!ev) return;
+  // 既存回答を再ロード
+  const name = localStorage.getItem('choseiName_'+ev.id)||'';
+  draftSlots = {};
+  if(name){
+    try {
+      const rows = await sb.get(`responses?event_id=eq.${encodeURIComponent(ev.id)}&name=eq.${encodeURIComponent(name)}&select=slots`);
+      if(rows?.[0]?.slots) draftSlots = rows[0].slots;
+    } catch(_){}
+  }
+  renderGrid('r');
+  showView('view-respond');
 }
 
 // ================================================================
@@ -886,43 +930,59 @@ function renderGrid(mode) {
 }
 
 // ================================================================
-//  ドラッグ選択（マウス）
+//  タッチ操作（タップで所要時間分まとめてON/OFF）
 // ================================================================
+let touchStartY = 0;
+function onTS(e) {
+  touchStartY = e.touches[0].clientY;
+  e.currentTarget._touchMoved = false;
+}
+function onTM(e) {
+  if(Math.abs(e.touches[0].clientY - touchStartY) > 8) {
+    e.currentTarget._touchMoved = true;
+  }
+}
+function onTE(e) {
+  const el = e.currentTarget;
+  if(el._touchMoved) return;
+  if(el.dataset.disabled==='1') return;
+  const key = el.dataset.key;
+  if(!key) return;
+  dragValue = draftSlots[key] !== true;
+  applySlotWithDuration(key);
+}
+
+// マウスクリック時も所要時間分適用
 function onMD(e) {
   e.preventDefault();
   const el = e.currentTarget;
   if(el.dataset.disabled==='1') return;
   const key = el.dataset.key;
   isDragging=true; dragValue=draftSlots[key]!==true;
-  touchedSlots=new Set([key]); applySlot(key);
+  touchedSlots=new Set([key]); applySlotWithDuration(key);
 }
 function onMO(e) {
   if(!isDragging) return;
   const el = e.currentTarget;
   if(el.dataset.disabled==='1') return;
   const key = el.dataset.key;
-  if(!touchedSlots.has(key)){ touchedSlots.add(key); applySlot(key); }
+  if(!touchedSlots.has(key)){ touchedSlots.add(key); applySlotWithDuration(key); }
 }
-document.addEventListener('mouseup', ()=>{ isDragging=false; touchedSlots.clear(); });
 
-// ================================================================
-//  タッチ操作（シングルタップのみ：タップで切り替え）
-// ================================================================
-function onTS(e) {
-  // タッチ開始時は何もしない（移動か単タップか判断待ち）
-  e.currentTarget._touchMoved = false;
-}
-function onTM(e) {
-  // 指が動いたらスクロール扱い（選択しない）
-  e.currentTarget._touchMoved = true;
-}
-function onTE(e) {
-  const el = e.currentTarget;
-  if(el._touchMoved) return; // スクロール中は無視
-  const key = el.dataset.key;
-  if(!key) return;
-  dragValue = draftSlots[key] !== true;
-  applySlot(key);
+// 所要時間分のスロットをまとめてON/OFF
+function applySlotWithDuration(startKey) {
+  const dur = currentEvent ? (currentEvent.duration || 2) : 2; // スロット数
+  const [date, time] = startKey.split('_');
+  const startIdx = SLOTS.indexOf(time);
+  if(startIdx === -1) return;
+  for(let i = 0; i < dur; i++){
+    const idx = startIdx + i;
+    if(idx >= SLOTS.length) break;
+    const key = `${date}_${SLOTS[idx]}`;
+    const avail = currentEvent?.available_slots;
+    if(avail && Object.keys(avail).length>0 && !avail[key]) break; // 制限外ならそこで止める
+    applySlot(key);
+  }
 }
 
 function applySlot(key) {
