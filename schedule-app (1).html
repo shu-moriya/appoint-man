@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>アポイント満 — 日程調整ツール</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap');
+
+  :root {
+    --ink: #1a1a2e;
+    --paper: #f5f0e8;
+    --cream: #ede8dc;
+    --accent: #c84b31;
+    --accent2: #e8a838;
+    --muted: #8a8070;
+    --green: #3a7d44;
+    --red: #c84b31;
+    --blue: #2d5fa6;
+    --border: #c8bfa8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(200,191,168,0.25) 27px, rgba(200,191,168,0.25) 28px);
+  }
+
+  header {
+    background: var(--ink); color: var(--paper);
+    padding: 0 24px; display: flex; align-items: center; justify-content: space-between;
+    height: 56px; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  }
+  .logo { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--accent2); cursor: pointer; }
+  .logo span { color: rgba(245,240,232,0.6); font-size: 12px; font-family: 'Noto Sans JP',sans-serif; font-weight:300; margin-left:10px; letter-spacing:.15em; }
+
+  .view { display: none; padding: 32px 16px; max-width: 960px; margin: 0 auto; }
+  .view.active { display: block; }
+
+  .card { background: white; border: 1.5px solid var(--border); border-radius: 4px; padding: 32px; margin-bottom: 24px; box-shadow: 4px 4px 0 var(--border); }
+  .card-title { font-family: 'Playfair Display',serif; font-size: 20px; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 2px solid var(--ink); }
+  .card-title small { font-family: 'DM Mono',monospace; font-size: 11px; color: var(--muted); display: block; margin-top: 4px; letter-spacing: .1em; }
+
+  .form-group { margin-bottom: 20px; }
+  label { display:block; font-size:11px; font-weight:700; letter-spacing:.12em; color:var(--muted); margin-bottom:6px; text-transform:uppercase; }
+  input[type="text"],input[type="password"],input[type="date"],textarea,select {
+    width:100%; padding:10px 14px; border:1.5px solid var(--border); border-radius:3px;
+    font-family:'Noto Sans JP',sans-serif; font-size:15px; background:var(--paper); color:var(--ink);
+    transition:border-color .2s; outline:none;
+  }
+  input:focus,textarea:focus,select:focus { border-color:var(--ink); background:white; }
+  textarea { resize:vertical; min-height:80px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:560px){ .form-row { grid-template-columns:1fr; } }
+
+  .btn { display:inline-flex; align-items:center; gap:6px; padding:10px 22px; border-radius:3px; font-family:'Noto Sans JP',sans-serif; font-size:14px; font-weight:700; cursor:pointer; border:2px solid transparent; transition:all .15s; letter-spacing:.03em; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-primary { background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .btn-primary:hover:not(:disabled) { background:var(--accent); border-color:var(--accent); }
+  .btn-outline { background:transparent; color:var(--ink); border-color:var(--ink); }
+  .btn-outline:hover:not(:disabled) { background:var(--ink); color:var(--paper); }
+  .btn-ghost { background:var(--cream); color:var(--ink); border-color:var(--border); }
+  .btn-ghost:hover { background:var(--border); }
+  .btn-sm { padding:6px 14px; font-size:12px; }
+  .flex-gap { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+  .tab-group { display:flex; border:1.5px solid var(--border); border-radius:4px; overflow:hidden; }
+  .tab-btn { flex:1; padding:10px; text-align:center; cursor:pointer; font-size:13px; font-weight:500; background:var(--paper); border:none; transition:all .15s; font-family:'Noto Sans JP',sans-serif; color:var(--muted); border-right:1.5px solid var(--border); }
+  .tab-btn:last-child { border-right:none; }
+  .tab-btn.active { background:var(--ink); color:var(--paper); }
+
+  .date-range-row { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; }
+  .date-range-row input[type="date"] { width:155px; flex-shrink:0; }
+  .candidate-list { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; min-height:10px; }
+  .candidate-tag { display:inline-flex; align-items:center; gap:6px; background:var(--cream); border:1px solid var(--border); border-radius:3px; padding:4px 10px; font-size:13px; font-family:'DM Mono',monospace; }
+  .candidate-tag button { background:none; border:none; cursor:pointer; color:var(--muted); font-size:14px; line-height:1; padding:0; }
+  .candidate-tag button:hover { color:var(--red); }
+
+  .link-box { background:var(--cream); border:1.5px dashed var(--border); border-radius:4px; padding:20px; margin-top:16px; }
+  .link-url { font-family:'DM Mono',monospace; font-size:13px; word-break:break-all; background:white; border:1px solid var(--border); border-radius:3px; padding:10px 12px; margin-bottom:10px; color:var(--blue); }
+
+  .alert { padding:12px 16px; border-radius:3px; font-size:13px; margin-bottom:16px; border-left:4px solid; line-height:1.6; }
+  .alert-info    { background:rgba(45,95,166,.08);  border-color:var(--blue);    color:var(--blue); }
+  .alert-success { background:rgba(58,125,68,.10);  border-color:var(--green);   color:#2a5c32; }
+  .alert-error   { background:rgba(200,75,49,.10);  border-color:var(--red);     color:var(--red); }
+  .alert-warn    { background:rgba(232,168,56,.15); border-color:var(--accent2); color:#7a5c10; }
+
+  #setup-banner { background:#fff3cd; border:2px solid var(--accent2); border-radius:4px; padding:16px 20px; margin-bottom:20px; font-size:13px; line-height:1.75; }
+  #setup-banner strong { font-size:14px; display:block; margin-bottom:6px; }
+  #setup-banner code { background:rgba(0,0,0,.07); padding:2px 6px; border-radius:3px; font-family:'DM Mono',monospace; font-size:12px; }
+
+  .hero { text-align:center; padding:48px 20px 32px; }
+  .hero-title { font-family:'Playfair Display',serif; font-size:44px; line-height:1.2; margin-bottom:16px; }
+  @media(max-width:560px){ .hero-title { font-size:30px; } }
+  .hero-sub { color:var(--muted); font-size:16px; margin-bottom:36px; line-height:1.8; }
+  .home-actions { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; margin-bottom:40px; }
+  .feature-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:14px; text-align:left; }
+  .feature-card { background:white; border:1.5px solid var(--border); border-radius:4px; padding:18px; box-shadow:3px 3px 0 var(--border); }
+  .feature-icon { font-size:22px; margin-bottom:8px; }
+  .feature-card h3 { font-size:14px; font-weight:700; margin-bottom:6px; }
+  .feature-card p { font-size:12px; color:var(--muted); line-height:1.65; }
+
+  .event-info-bar { background:var(--ink); color:var(--paper); padding:14px 20px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:20px; border-radius:4px; }
+  .ev-title { font-family:'Playfair Display',serif; font-size:18px; color:var(--accent2); }
+  .ev-meta  { font-family:'DM Mono',monospace; font-size:11px; color:rgba(245,240,232,.55); }
+
+  .schedule-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .schedule-nav-title { font-family:'DM Mono',monospace; font-size:13px; color:var(--muted); }
+  .schedule-wrapper { overflow-x:auto; border:1.5px solid var(--border); border-radius:4px; background:white; box-shadow:4px 4px 0 var(--border); }
+  .schedule-grid { display:grid; min-width:560px; position:relative; user-select:none; }
+
+  .time-col-header { background:var(--ink); color:var(--paper); font-family:'DM Mono',monospace; font-size:10px; padding:8px 4px; text-align:center; letter-spacing:.06em; position:sticky; top:0; z-index:10; border-right:1px solid rgba(255,255,255,.12); }
+  .day-header { background:var(--ink); color:var(--paper); font-size:12px; font-weight:700; padding:8px 4px; text-align:center; position:sticky; top:0; z-index:10; border-right:1px solid rgba(255,255,255,.12); letter-spacing:.04em; }
+  .day-header .wd { font-size:10px; color:rgba(255,255,255,.55); font-weight:300; }
+  .day-header.sat { background:#1e4080; }
+  .day-header.sun { background:#902b1a; }
+
+  .time-label { background:var(--cream); font-family:'DM Mono',monospace; font-size:10px; padding:0 5px; display:flex; align-items:center; justify-content:flex-end; color:var(--muted); border-right:1.5px solid var(--border); border-bottom:1px dotted rgba(200,191,168,.4); min-height:26px; white-space:nowrap; }
+  .time-label.h-start { border-top:1.5px solid var(--border); color:var(--ink); font-weight:600; }
+
+  .slot { min-height:26px; border-right:1px solid rgba(200,191,168,.35); border-bottom:1px dotted rgba(200,191,168,.35); cursor:pointer; transition:background .08s; position:relative; touch-action:none; }
+  .slot.h-start { border-top:1px solid rgba(200,191,168,.5); }
+  .slot:hover:not(.slot-disabled) { background:rgba(232,168,56,.18) !important; }
+  .slot.sel-good { background:rgba(58,125,68,.22); }
+  .slot.sel-bad  { background:rgba(200,75,49,.18); }
+  .slot.avail-set { background:rgba(45,95,166,.13); }
+  .slot.slot-disabled { background:rgba(200,191,168,.15); cursor:not-allowed; opacity:.5; }
+  .organizer-badge { display:inline-block; background:var(--ink); color:var(--paper); font-size:11px; font-family:'DM Mono',monospace; padding:3px 10px; border-radius:3px; margin-bottom:10px; letter-spacing:.06em; }
+
+  .slot.h0   { background:white; }
+  .slot.h1   { background:rgba(58,125,68,.12); }
+  .slot.h2   { background:rgba(58,125,68,.28); }
+  .slot.h3   { background:rgba(58,125,68,.45); }
+  .slot.h4   { background:rgba(58,125,68,.62); }
+  .slot.h5   { background:rgba(58,125,68,.80); }
+  .slot.hmax { background:rgba(58,125,68,.94); }
+  .slot-cnt { position:absolute; right:3px; top:1px; font-family:'DM Mono',monospace; font-size:10px; color:var(--green); font-weight:600; pointer-events:none; line-height:1; }
+  .slot.h4 .slot-cnt,.slot.h5 .slot-cnt,.slot.hmax .slot-cnt { color:white; }
+
+  .respondent-tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .resp-tag { padding:4px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; border:2px solid transparent; transition:all .15s; }
+  .resp-tag.on { border-color:var(--ink); }
+
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+  .legend-item { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--muted); }
+  .legend-dot { width:14px; height:14px; border-radius:2px; border:1px solid var(--border); }
+
+  .modal-bg { display:none; position:fixed; inset:0; background:rgba(26,26,46,.55); z-index:200; align-items:center; justify-content:center; padding:16px; }
+  .modal-bg.open { display:flex; }
+  .modal { background:white; border:2px solid var(--ink); border-radius:4px; padding:28px; max-width:400px; width:100%; box-shadow:8px 8px 0 var(--ink); animation:popIn .18s ease; }
+  @keyframes popIn { from{transform:scale(.9);opacity:0} to{transform:scale(1);opacity:1} }
+  .modal-title { font-family:'Playfair Display',serif; font-size:19px; margin-bottom:18px; }
+  .modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+
+  .loading { display:inline-block; width:18px; height:18px; border:2.5px solid var(--border); border-top-color:var(--ink); border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .loading-overlay { display:flex; align-items:center; justify-content:center; padding:40px; gap:12px; color:var(--muted); font-size:14px; }
+
+  .divider { border:none; border-top:1.5px solid var(--border); margin:22px 0; }
+  .text-muted { color:var(--muted); font-size:13px; }
+  .instructions { background:var(--cream); border:1px solid var(--border); border-radius:4px; padding:12px 16px; font-size:13px; line-height:1.7; color:var(--muted); margin-bottom:14px; }
+  .name-row { display:flex; gap:10px; align-items:flex-end; margin-bottom:16px; flex-wrap:wrap; }
+  .name-row > div { flex:1; min-width:160px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo" onclick="goHome()">アポイント満 <span>日程調整ツール</span></div>
+  <button class="btn btn-sm" style="border-color:rgba(245,240,232,.35);color:var(--paper);background:transparent" onclick="goHome()">🏠 ホーム</button>
+</header>
+
+<!-- HOME -->
+<div id="view-home" class="view active">
+  <div id="setup-banner" style="display:none">
+    <strong>⚙️ Supabase の設定が必要です</strong>
+    このアプリはデータ保存に <strong>Supabase</strong>（無料）を使います。<br>
+    HTMLファイル内の <code>SUPABASE_URL</code> と <code>SUPABASE_KEY</code> を設定してください。<br>
+    詳しくは同梱の <strong>セットアップ手順書.txt</strong> をご覧ください。
+  </div>
+  <div class="hero">
+    <div class="hero-title">日程調整を、<br>もっとシンプルに。</div>
+    <p class="hero-sub">招集者がイベントを作り、参加者が都合を入力するだけ。<br>ログイン不要・社外の方とも共有できます。</p>
+    <div class="home-actions">
+      <button class="btn btn-primary" style="font-size:15px;padding:13px 30px" onclick="showView('view-create')">＋ イベントを作成する</button>
+      <button class="btn btn-outline" style="font-size:15px;padding:13px 30px" onclick="showView('view-join-top')">📅 イベントに参加する</button>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card"><div class="feature-icon">🔒</div><h3>パスワード管理</h3><p>イベントごとにパスワードを設定。URLとパスワードを共有するだけで使えます。</p></div>
+      <div class="feature-card"><div class="feature-icon">⏰</div><h3>30分単位で入力</h3><p>8:00〜20:00を30分刻みで表示。クリック・ドラッグで直感的に入力できます。</p></div>
+      <div class="feature-card"><div class="feature-icon">📊</div><h3>ヒートマップ集計</h3><p>参加者の回答をリアルタイム集計。最適な時間帯が一目でわかります。</p></div>
+      <div class="feature-card"><div class="feature-icon">📱</div><h3>スマホ完全対応</h3><p>PCでもスマートフォンでも快適に操作できます。</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE EVENT -->
+<div id="view-create" class="view">
+  <div class="card">
+    <div class="card-title">イベントを作成する <small>CREATE EVENT</small></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>あなたのニックネーム（主催者名）</label>
+        <input type="text" id="c-organizer" placeholder="例：田中">
+      </div>
+      <div class="form-group">
+        <label>イベント名</label>
+        <input type="text" id="c-title" placeholder="例：第2回プロジェクト定例">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>内容・説明（任意）</label>
+      <textarea id="c-desc" placeholder="例：Q2振り返りと次期計画の議論。オンライン開催予定。"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>所要時間</label>
+        <select id="c-duration">
+          <option value="1">30分</option>
+          <option value="2" selected>1時間</option>
+          <option value="3">1時間30分</option>
+          <option value="4">2時間</option>
+          <option value="6">3時間</option>
+          <option value="8">4時間</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>共有パスワード</label>
+        <input type="password" id="c-password" placeholder="参加者に伝えるパスワード">
+      </div>
+    </div>
+    <hr class="divider">
+    <div class="form-group">
+      <label>回答方式</label>
+      <div class="tab-group">
+        <button class="tab-btn active" id="mode-good" onclick="setInputMode('good')">✅ 都合の良い時間を選ぶ</button>
+        <button class="tab-btn" id="mode-bad"  onclick="setInputMode('bad')">❌ 都合の悪い時間を選ぶ</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>候補日を追加（任意）</label>
+      <div class="date-range-row">
+        <input type="date" id="c-date-from">
+        <span style="color:var(--muted);font-size:13px;align-self:center">〜</span>
+        <input type="date" id="c-date-to">
+        <button class="btn btn-outline btn-sm" onclick="addDateRange()">範囲追加</button>
+        <button class="btn btn-ghost  btn-sm" onclick="addSingleDate()">1日追加</button>
+      </div>
+      <div id="candidate-list" class="candidate-list"></div>
+      <p class="text-muted" style="margin-top:8px;font-size:12px">※ 候補日未設定の場合、今日から2週間分が表示されます。</p>
+    </div>
+    <hr class="divider">
+    <div class="form-group">
+      <label>選択可能な時間帯を設定（任意）</label>
+      <p class="text-muted" style="margin-bottom:10px;font-size:12px">参加者が選択できる時間帯を絞り込めます。クリック・ドラッグで青くした時間帯のみ参加者が選択できます。未設定の場合はすべての時間帯が選択可能です。</p>
+      <div class="schedule-nav" style="margin-bottom:8px">
+        <button class="btn btn-outline btn-sm" onclick="prevWeekSetup()">← 前の週</button>
+        <div class="schedule-nav-title" id="setup-week-label"></div>
+        <button class="btn btn-outline btn-sm" onclick="nextWeekSetup()">次の週 →</button>
+      </div>
+      <div class="schedule-wrapper">
+        <div class="schedule-grid" id="setup-grid"></div>
+      </div>
+      <div class="flex-gap" style="margin-top:10px">
+        <button class="btn btn-ghost btn-sm" onclick="setupSelectAll()">すべて選択</button>
+        <button class="btn btn-ghost btn-sm" onclick="setupClearAll()">すべてクリア</button>
+      </div>
+    </div>
+    <div id="create-error" class="alert alert-error" style="display:none"></div>
+    <div class="flex-gap">
+      <button class="btn btn-primary" id="btn-create" onclick="submitCreateEvent()">イベントを作成する →</button>
+      <button class="btn btn-outline" onclick="goHome()">キャンセル</button>
+    </div>
+  </div>
+
+  <div id="view-created" style="display:none">
+    <div class="card">
+      <div class="card-title">✅ イベントが作成されました <small>EVENT CREATED</small></div>
+      <div class="alert alert-success">以下のURLとパスワードを参加者にメール等でお知らせください。</div>
+      <div class="link-box">
+        <p style="font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">SHARE URL</p>
+        <div class="link-url" id="share-url"></div>
+        <div class="flex-gap">
+          <button class="btn btn-sm btn-primary" onclick="copyShareUrl()">📋 参加者URLをコピー</button>
+          <button class="btn btn-sm btn-outline" onclick="goToResultView()">📊 集計ページを開く</button>
+        </div>
+        <hr class="divider" style="margin:14px 0">
+        <p style="font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">PASSWORD（参加者・招集者共通）</p>
+        <div class="link-url" id="share-password"></div>
+        <hr class="divider" style="margin:14px 0">
+        <p style="font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">🔑 招集者専用URL（集計ページ直リンク）</p>
+        <div class="link-url" id="share-org-url"></div>
+        <div class="flex-gap">
+          <button class="btn btn-sm btn-ghost" onclick="copyOrgUrl()">📋 招集者URLをコピー</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JOIN TOP -->
+<div id="view-join-top" class="view">
+  <div class="card">
+    <div class="card-title">イベントに参加する <small>JOIN EVENT</small></div>
+    <p class="text-muted" style="margin-bottom:20px">招集者から共有されたイベントIDとパスワードを入力してください。</p>
+    <div class="form-group">
+      <label>イベントID</label>
+      <input type="text" id="j-event-id" placeholder="例：abc12345">
+    </div>
+    <div class="form-group">
+      <label>パスワード</label>
+      <input type="password" id="j-password" placeholder="" onkeydown="if(event.key==='Enter') submitJoin()">
+    </div>
+    <div id="join-error" class="alert alert-error" style="display:none"></div>
+    <div class="flex-gap">
+      <button class="btn btn-primary" id="btn-join" onclick="submitJoin()">参加する →</button>
+      <button class="btn btn-outline" onclick="goHome()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESPOND VIEW -->
+<div id="view-respond" class="view">
+  <div class="event-info-bar">
+    <div>
+      <div class="ev-title" id="r-title"></div>
+      <div class="ev-meta"  id="r-meta"></div>
+    </div>
+  </div>
+  <div class="card" style="padding:22px">
+    <div class="instructions" id="r-instructions"></div>
+    <div class="name-row">
+      <div>
+        <label>あなたの名前</label>
+        <input type="text" id="r-name" placeholder="ニックネームでもOK">
+      </div>
+      <button class="btn btn-primary" id="btn-save" onclick="submitSaveResponse()">保存する</button>
+    </div>
+    <div id="r-saved-msg"  class="alert alert-success" style="display:none">✅ 回答を保存しました！</div>
+    <div id="r-save-error" class="alert alert-error"   style="display:none"></div>
+    <div class="legend" id="r-legend"></div>
+    <div class="schedule-nav">
+      <button class="btn btn-outline btn-sm" onclick="prevWeek('r')">← 前の週</button>
+      <div class="schedule-nav-title" id="r-week-label"></div>
+      <button class="btn btn-outline btn-sm" onclick="nextWeek('r')">次の週 →</button>
+    </div>
+    <div class="schedule-wrapper">
+      <div class="schedule-grid" id="r-grid"></div>
+    </div>
+    <p class="text-muted" style="font-size:12px;margin-top:8px">クリック・ドラッグまたはタップで連続選択できます。再クリックで解除。</p>
+  </div>
+</div>
+
+<!-- RESULT VIEW -->
+<div id="view-result" class="view">
+  <div class="event-info-bar">
+    <div>
+      <div class="ev-title" id="res-title"></div>
+      <div class="ev-meta"  id="res-meta"></div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" style="background:var(--accent2);color:var(--ink);font-weight:700;border-color:transparent" onclick="copyShareUrl()">📋 URLをコピー</button>
+      <button class="btn btn-sm btn-ghost" onclick="loadResultData()">🔄 更新</button>
+    </div>
+  </div>
+  <div class="card" style="padding:22px">
+    <div class="flex-gap" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:14px">
+      <strong>回答者一覧</strong>
+      <span class="text-muted" id="res-count"></span>
+    </div>
+    <div class="respondent-tags" id="res-respondents"></div>
+    <p class="text-muted" style="font-size:12px;margin-top:6px">名前をクリックするとその人の回答のみ表示（複数選択可）。</p>
+    <hr class="divider">
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(58,125,68,.9)"></div>全員OK</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(58,125,68,.45)"></div>一部OK</div>
+      <div class="legend-item"><div class="legend-dot" style="background:white;border-color:var(--border)"></div>なし</div>
+    </div>
+    <div class="schedule-nav">
+      <button class="btn btn-outline btn-sm" onclick="prevWeek('res')">← 前の週</button>
+      <div class="schedule-nav-title" id="res-week-label"></div>
+      <button class="btn btn-outline btn-sm" onclick="nextWeek('res')">次の週 →</button>
+    </div>
+    <div id="res-loading" class="loading-overlay" style="display:none"><div class="loading"></div>読み込み中…</div>
+    <div class="schedule-wrapper">
+      <div class="schedule-grid" id="res-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PASSWORD MODAL -->
+<div class="modal-bg" id="modal-pw">
+  <div class="modal">
+    <div class="modal-title">🔐 パスワードを入力</div>
+    <div class="form-group">
+      <label>イベントパスワード</label>
+      <input type="password" id="modal-pw-input" placeholder="" onkeydown="if(event.key==='Enter') confirmModalPw()">
+    </div>
+    <div id="modal-pw-error" class="alert alert-error" style="display:none">パスワードが違います</div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmModalPw()">確認する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+//  ★ SUPABASE 設定 — ここを書き換えてください
+// ================================================================
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';    // 例: https://xxxxxxxx.supabase.co
+const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY'; // anon/public キー
+
+// ================================================================
+//  Supabase REST ラッパー（supabase-js 不要、fetch のみ）
+// ================================================================
+const sb = {
+  h() {
+    return {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json'
+    };
+  },
+  async get(path) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: this.h() });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async post(path, body, prefer='return=representation') {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      method: 'POST', headers: { ...this.h(), 'Prefer': prefer },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) throw new Error(await r.text());
+    if (r.status === 204) return null;
+    return r.json();
+  },
+  async getEvent(id) {
+    const rows = await this.get(`events?id=eq.${encodeURIComponent(id)}&select=*`);
+    return rows?.[0] || null;
+  },
+  async insertEvent(ev) {
+    const rows = await this.post('events', ev);
+    return rows?.[0] || null;
+  },
+  async getResponses(eventId) {
+    return await this.get(`responses?event_id=eq.${encodeURIComponent(eventId)}&select=*`) || [];
+  },
+  async upsertResponse(data) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/responses`, {
+      method: 'POST',
+      headers: { ...this.h(), 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(data)
+    });
+    if (!r.ok) throw new Error(await r.text());
+    return r.status === 204 ? null : r.json();
+  }
+};
+
+// ================================================================
+//  グローバル状態
+// ================================================================
+let currentEvent   = null;
+let currentWeekR   = 0;
+let currentWeekRes = 0;
+let inputMode      = 'good';
+let candidateDates = [];
+let respondentFilter = [];
+let pendingAfterPw = null;
+let draftSlots     = {};
+let allResponses   = [];
+
+const RESP_COLORS = ['#e57373','#64b5f6','#81c784','#ffb74d','#ba68c8','#4db6ac','#f06292','#aed581','#ff8a65','#90a4ae'];
+
+// ドラッグ状態
+let isDragging   = false;
+let dragValue    = null;
+let touchedSlots = new Set();
+
+// 招集者が設定する選択可能時間帯 { slotKey: true }
+let setupSlots   = {};
+let setupWeek    = 0;
+let setupDates   = []; // 候補日（設定グリッド用）
+
+// ================================================================
+//  ユーティリティ
+// ================================================================
+function genId() { return Math.random().toString(36).slice(2,10); }
+function formatDate(d) {
+  if (typeof d === 'string') return d;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function addDays(s, n) {
+  const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate()+n); return formatDate(d);
+}
+function dateLabel(s) {
+  const d = new Date(s + 'T00:00:00');
+  return { label:`${d.getMonth()+1}/${d.getDate()}`, wd:['日','月','火','水','木','金','土'][d.getDay()], wdNum:d.getDay() };
+}
+function timeSlots() {
+  const s=[];
+  for(let h=8;h<20;h++){ s.push(`${String(h).padStart(2,'0')}:00`); s.push(`${String(h).padStart(2,'0')}:30`); }
+  return s;
+}
+const SLOTS = timeSlots();
+const DUR_LABEL = {1:'30分',2:'1時間',3:'1時間30分',4:'2時間',6:'3時間',8:'4時間'};
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function isConfigured() { return SUPABASE_URL !== 'YOUR_SUPABASE_URL'; }
+
+function setLoading(id, on) {
+  const b = document.getElementById(id); if(!b) return;
+  b.disabled = on;
+  if(on){ b._t = b.innerHTML; b.innerHTML = '<span class="loading"></span>'; }
+  else if(b._t){ b.innerHTML = b._t; }
+}
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function goHome() {
+  currentEvent=null; currentWeekR=0; currentWeekRes=0;
+  respondentFilter=[]; draftSlots={}; allResponses=[];
+  showView('view-home');
+}
+function buildUrl(id) { return `${location.origin}${location.pathname}?event=${id}`; }
+function copyShareUrl() {
+  const url = currentEvent ? buildUrl(currentEvent.id) : document.getElementById('share-url').textContent;
+  navigator.clipboard.writeText(url).then(()=>alert('参加者URLをコピーしました！'));
+}
+function copyOrgUrl() {
+  const url = currentEvent ? buildOrganizerUrl(currentEvent.id) : document.getElementById('share-org-url').textContent;
+  navigator.clipboard.writeText(url).then(()=>alert('招集者URLをコピーしました！'));
+}
+
+// ================================================================
+//  初期化
+// ================================================================
+window.addEventListener('DOMContentLoaded', ()=>{
+  if(!isConfigured()) document.getElementById('setup-banner').style.display='block';
+  const today = formatDate(new Date());
+  document.getElementById('c-date-from').value = today;
+  document.getElementById('c-date-to').value   = addDays(today,6);
+  initSetupGrid();
+  checkUrlParams();
+});
+
+// ================================================================
+//  入力方式切り替え
+// ================================================================
+function setInputMode(mode) {
+  inputMode = mode;
+  document.getElementById('mode-good').classList.toggle('active', mode==='good');
+  document.getElementById('mode-bad').classList.toggle('active',  mode==='bad');
+}
+
+// ================================================================
+//  候補日
+// ================================================================
+function addDateRange() {
+  const f = document.getElementById('c-date-from').value;
+  const t = document.getElementById('c-date-to').value;
+  if(!f||!t){ alert('開始日と終了日を入力してください'); return; }
+  if(f>t){ alert('開始日は終了日以前にしてください'); return; }
+  let c=f;
+  while(c<=t){ if(!candidateDates.includes(c)) candidateDates.push(c); c=addDays(c,1); }
+  candidateDates.sort(); renderCandidateList();
+}
+function addSingleDate() {
+  const d = document.getElementById('c-date-from').value;
+  if(!d){ alert('日付を入力してください'); return; }
+  if(!candidateDates.includes(d)){ candidateDates.push(d); candidateDates.sort(); }
+  renderCandidateList();
+}
+function removeCandidate(d) { candidateDates=candidateDates.filter(x=>x!==d); renderCandidateList(); }
+function renderCandidateList() {
+  document.getElementById('candidate-list').innerHTML = candidateDates.map(d=>{
+    const {label,wd} = dateLabel(d);
+    return `<div class="candidate-tag">${label}（${wd}）<button onclick="removeCandidate('${d}')">×</button></div>`;
+  }).join('');
+  // 候補日が変わったらセットアップグリッドも再描画
+  setupDates = [...candidateDates];
+  if(setupDates.length===0){
+    const today = formatDate(new Date());
+    for(let i=0;i<14;i++) setupDates.push(addDays(today,i));
+  }
+  renderSetupGrid();
+}
+
+// ================================================================
+//  イベント作成
+// ================================================================
+async function submitCreateEvent() {
+  const errEl = document.getElementById('create-error');
+  errEl.style.display='none';
+  if(!isConfigured()){
+    errEl.textContent='Supabase の設定が完了していません。セットアップ手順書をご確認ください。';
+    errEl.style.display='block'; return;
+  }
+  const organizer = document.getElementById('c-organizer').value.trim();
+  const title     = document.getElementById('c-title').value.trim();
+  const desc      = document.getElementById('c-desc').value.trim();
+  const duration  = parseInt(document.getElementById('c-duration').value);
+  const password  = document.getElementById('c-password').value;
+
+  if(!organizer){ errEl.textContent='ニックネームを入力してください'; errEl.style.display='block'; return; }
+  if(!title)    { errEl.textContent='イベント名を入力してください';   errEl.style.display='block'; return; }
+  if(!password) { errEl.textContent='パスワードを設定してください';   errEl.style.display='block'; return; }
+
+  let dates = [...candidateDates];
+  if(dates.length===0){
+    const today = formatDate(new Date());
+    for(let i=0;i<14;i++) dates.push(addDays(today,i));
+  }
+
+  const id = genId();
+  // 選択可能スロット: 空なら全スロット許可（null保存）
+  const hasSetup = Object.keys(setupSlots).length > 0;
+  const payload = { id, organizer, title, description: desc, duration, password, input_mode: inputMode, dates: dates.join(','), available_slots: hasSetup ? setupSlots : null };
+
+  setLoading('btn-create', true);
+  try {
+    await sb.insertEvent(payload);
+    const hasSetup2 = Object.keys(setupSlots).length > 0;
+    currentEvent = { id, organizer, title, desc, duration, password, inputMode, dates, available_slots: hasSetup2 ? setupSlots : null };
+    document.getElementById('share-url').textContent      = buildUrl(id);
+    document.getElementById('share-password').textContent = password;
+    document.getElementById('share-org-url').textContent  = buildOrganizerUrl(id);
+    document.getElementById('view-created').style.display = 'block';
+    document.getElementById('view-created').scrollIntoView({behavior:'smooth'});
+  } catch(e) {
+    errEl.textContent = 'イベントの作成に失敗しました: ' + e.message;
+    errEl.style.display='block';
+  } finally {
+    setLoading('btn-create', false);
+  }
+}
+function goToResultView() { if(currentEvent) openResultView(currentEvent); }
+
+// ================================================================
+//  イベント参加
+// ================================================================
+async function submitJoin() {
+  const err = document.getElementById('join-error');
+  err.style.display='none';
+  const id = document.getElementById('j-event-id').value.trim();
+  const pw = document.getElementById('j-password').value;
+  if(!id){ err.textContent='イベントIDを入力してください'; err.style.display='block'; return; }
+
+  setLoading('btn-join', true);
+  try {
+    const ev = await sb.getEvent(id);
+    if(!ev){ err.textContent='イベントが見つかりません'; err.style.display='block'; return; }
+    if(ev.password!==pw){ err.textContent='パスワードが違います'; err.style.display='block'; return; }
+    currentEvent = normalizeEv(ev);
+    openRespondView(currentEvent);
+  } catch(e) {
+    err.textContent='接続エラー: '+e.message; err.style.display='block';
+  } finally {
+    setLoading('btn-join', false);
+  }
+}
+
+function normalizeEv(ev) {
+  if(typeof ev.dates==='string') ev.dates = ev.dates.split(',');
+  ev.inputMode = ev.input_mode || ev.inputMode || 'good';
+  // available_slots: null or object
+  if(ev.available_slots === undefined) ev.available_slots = null;
+  return ev;
+}
+
+// ================================================================
+//  URLルーティング
+// ================================================================
+async function checkUrlParams() {
+  const params     = new URLSearchParams(location.search);
+  const eventId    = params.get('event');
+  const isOrganizer = params.get('organizer') === '1';
+  if(!eventId) return;
+  if(!isConfigured()){
+    document.getElementById('j-event-id').value = eventId;
+    showView('view-join-top'); return;
+  }
+  try {
+    const ev = await sb.getEvent(eventId);
+    if(!ev){ document.getElementById('j-event-id').value=eventId; showView('view-join-top'); return; }
+    currentEvent = normalizeEv(ev);
+    if(isOrganizer){
+      pendingAfterPw = ()=>openResultView(currentEvent);
+    } else {
+      pendingAfterPw = ()=>openRespondView(currentEvent);
+    }
+    openModal();
+  } catch(e) {
+    document.getElementById('j-event-id').value = eventId;
+    showView('view-join-top');
+  }
+}
+
+// ================================================================
+//  パスワードモーダル
+// ================================================================
+function openModal() {
+  document.getElementById('modal-pw').classList.add('open');
+  document.getElementById('modal-pw-input').value='';
+  document.getElementById('modal-pw-error').style.display='none';
+  setTimeout(()=>document.getElementById('modal-pw-input').focus(),120);
+}
+function closeModal() { document.getElementById('modal-pw').classList.remove('open'); pendingAfterPw=null; }
+function confirmModalPw() {
+  const pw = document.getElementById('modal-pw-input').value;
+  if(!currentEvent || pw!==currentEvent.password){
+    document.getElementById('modal-pw-error').style.display='block'; return;
+  }
+  document.getElementById('modal-pw').classList.remove('open');
+  if(pendingAfterPw){ pendingAfterPw(); pendingAfterPw=null; }
+}
+
+// ================================================================
+//  回答ビュー
+// ================================================================
+async function openRespondView(ev) {
+  currentWeekR=0; draftSlots={};
+  document.getElementById('r-title').textContent = ev.title;
+  document.getElementById('r-meta').textContent  = `主催：${ev.organizer} ／ 所要時間：${DUR_LABEL[ev.duration]||''} ／ ID：${ev.id}`;
+  document.getElementById('r-instructions').textContent = ev.inputMode==='good'
+    ? '✅ 参加可能な時間帯をクリック・ドラッグで選択してください。再クリックで解除できます。'
+    : '❌ 参加できない時間帯をクリック・ドラッグで選択してください。再クリックで解除できます。';
+  document.getElementById('r-legend').innerHTML = ev.inputMode==='good'
+    ? `<div class="legend-item"><div class="legend-dot" style="background:rgba(58,125,68,.22)"></div>参加可能</div>`
+    : `<div class="legend-item"><div class="legend-dot" style="background:rgba(200,75,49,.18)"></div>参加不可</div>`;
+
+  const savedName = localStorage.getItem('choseiName_'+ev.id)||'';
+  document.getElementById('r-name').value = savedName;
+  if(savedName){
+    try {
+      const rows = await sb.get(`responses?event_id=eq.${encodeURIComponent(ev.id)}&name=eq.${encodeURIComponent(savedName)}&select=slots`);
+      if(rows?.[0]?.slots) draftSlots = rows[0].slots;
+    } catch(_){}
+  }
+
+  document.getElementById('r-saved-msg').style.display  = 'none';
+  document.getElementById('r-save-error').style.display = 'none';
+  renderGrid('r');
+  showView('view-respond');
+}
+
+// ================================================================
+//  回答保存
+// ================================================================
+async function submitSaveResponse() {
+  const ev   = currentEvent;
+  const name = document.getElementById('r-name').value.trim();
+  const msgEl = document.getElementById('r-saved-msg');
+  const errEl = document.getElementById('r-save-error');
+  msgEl.style.display = errEl.style.display = 'none';
+  if(!name){ errEl.textContent='名前を入力してください'; errEl.style.display='block'; return; }
+
+  setLoading('btn-save', true);
+  try {
+    await sb.upsertResponse({ event_id:ev.id, name, slots:draftSlots });
+    localStorage.setItem('choseiName_'+ev.id, name);
+    msgEl.style.display='block';
+    msgEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+  } catch(e) {
+    errEl.textContent='保存に失敗しました: '+e.message; errEl.style.display='block';
+  } finally {
+    setLoading('btn-save', false);
+  }
+}
+
+// ================================================================
+//  集計ビュー
+// ================================================================
+async function openResultView(ev) {
+  currentWeekRes=0; respondentFilter=[];
+  document.getElementById('res-title').textContent = ev.title;
+  document.getElementById('res-meta').textContent  = `主催：${ev.organizer} ／ 所要時間：${DUR_LABEL[ev.duration]||''} ／ ID：${ev.id}`;
+  await loadResultData();
+  showView('view-result');
+}
+
+async function loadResultData() {
+  document.getElementById('res-loading').style.display='flex';
+  try {
+    const rows = await sb.getResponses(currentEvent.id);
+    allResponses = rows.map(r=>({ name:r.name, slots:r.slots||{} }));
+    renderResultRespondents();
+    renderGrid('res');
+  } catch(e){ console.error(e); }
+  finally{ document.getElementById('res-loading').style.display='none'; }
+}
+
+function renderResultRespondents() {
+  const names = allResponses.map(r=>r.name);
+  document.getElementById('res-count').textContent = `${names.length}名が回答`;
+  document.getElementById('res-respondents').innerHTML = names.map((name,i)=>{
+    const c = RESP_COLORS[i%RESP_COLORS.length];
+    const on = respondentFilter.length===0 || respondentFilter.includes(name);
+    return `<span class="resp-tag ${on?'on':''}" style="background:${c}22;color:${c};${on?`border-color:${c}`:'border-color:transparent'}" onclick="toggleFilter('${escHtml(name)}')">${escHtml(name)}</span>`;
+  }).join('');
+}
+
+function toggleFilter(name) {
+  if(respondentFilter.includes(name)) respondentFilter=respondentFilter.filter(n=>n!==name);
+  else respondentFilter.push(name);
+  renderResultRespondents(); renderGrid('res');
+}
+
+// ================================================================
+//  グリッド描画
+// ================================================================
+function renderGrid(mode) {
+  const ev = currentEvent; if(!ev) return;
+  const wo = mode==='r' ? currentWeekR : currentWeekRes;
+  const weekDates = ev.dates.slice(wo*7, wo*7+7);
+  if(!weekDates.length) return;
+
+  const gridEl = document.getElementById(`${mode}-grid`);
+  gridEl.style.gridTemplateColumns = `52px repeat(${weekDates.length},1fr)`;
+
+  let html = `<div class="time-col-header">時刻</div>`;
+  weekDates.forEach(d=>{
+    const {label,wd,wdNum} = dateLabel(d);
+    const cls = wdNum===0?'sun':wdNum===6?'sat':'';
+    html += `<div class="day-header ${cls}">${label}<br><span class="wd">${wd}</span></div>`;
+  });
+
+  SLOTS.forEach((slot,si)=>{
+    const isH = slot.endsWith(':00');
+    html += `<div class="time-label${isH?' h-start':''}">${slot}</div>`;
+    weekDates.forEach((d,di)=>{
+      const key = `${d}_${slot}`;
+      let cls = `slot${isH?' h-start':''}`;
+      if(mode==='r'){
+        const v = draftSlots[key];
+        // 選択可能スロット制限チェック
+        const avail = ev.available_slots;
+        const isDisabled = avail && Object.keys(avail).length > 0 && !avail[key];
+        if(isDisabled) cls+=' slot-disabled';
+        else {
+          if(ev.inputMode==='good'&&v===true) cls+=' sel-good';
+          if(ev.inputMode==='bad' &&v===true) cls+=' sel-bad';
+        }
+        html += `<div class="${cls}" data-key="${key}" data-disabled="${isDisabled?'1':''}"
+          onmousedown="onMD(event)" onmouseover="onMO(event)"
+          ontouchstart="onTS(event)" ontouchmove="onTM(event)" ontouchend="onTE(event)"
+        ></div>`;
+      } else {
+        const active = respondentFilter.length>0 ? respondentFilter : allResponses.map(r=>r.name);
+        const total  = active.length;
+        let ok=0;
+        active.forEach(name=>{
+          const r = allResponses.find(x=>x.name===name);
+          if(!r) return;
+          if(ev.inputMode==='good'){ if(r.slots[key]===true) ok++; }
+          else                     { if(r.slots[key]!==true) ok++; }
+        });
+        let hCls='h0';
+        if(total>0){
+          const ratio=ok/total;
+          if(ratio>=1) hCls='hmax';
+          else if(ratio>=.8) hCls='h5';
+          else if(ratio>=.6) hCls='h4';
+          else if(ratio>=.4) hCls='h3';
+          else if(ratio>=.2) hCls='h2';
+          else if(ratio>0)   hCls='h1';
+        }
+        const inner = ok>0 ? `<span class="slot-cnt">${ok}</span>` : '';
+        html += `<div class="${cls} ${hCls}">${inner}</div>`;
+      }
+    });
+  });
+
+  gridEl.innerHTML = html;
+  const lbl = `${dateLabel(weekDates[0]).label} 〜 ${dateLabel(weekDates[weekDates.length-1]).label}`;
+  document.getElementById(`${mode}-week-label`).textContent = lbl;
+}
+
+// ================================================================
+//  ドラッグ選択（マウス）
+// ================================================================
+function onMD(e) {
+  e.preventDefault();
+  const el = e.currentTarget;
+  if(el.dataset.disabled==='1') return;
+  const key = el.dataset.key;
+  isDragging=true; dragValue=draftSlots[key]!==true;
+  touchedSlots=new Set([key]); applySlot(key);
+}
+function onMO(e) {
+  if(!isDragging) return;
+  const el = e.currentTarget;
+  if(el.dataset.disabled==='1') return;
+  const key = el.dataset.key;
+  if(!touchedSlots.has(key)){ touchedSlots.add(key); applySlot(key); }
+}
+document.addEventListener('mouseup', ()=>{ isDragging=false; touchedSlots.clear(); });
+
+// ================================================================
+//  タッチ操作（シングルタップのみ：タップで切り替え）
+// ================================================================
+function onTS(e) {
+  // タッチ開始時は何もしない（移動か単タップか判断待ち）
+  e.currentTarget._touchMoved = false;
+}
+function onTM(e) {
+  // 指が動いたらスクロール扱い（選択しない）
+  e.currentTarget._touchMoved = true;
+}
+function onTE(e) {
+  const el = e.currentTarget;
+  if(el._touchMoved) return; // スクロール中は無視
+  const key = el.dataset.key;
+  if(!key) return;
+  dragValue = draftSlots[key] !== true;
+  applySlot(key);
+}
+
+function applySlot(key) {
+  draftSlots[key] = dragValue;
+  const el = document.querySelector(`#r-grid [data-key="${key}"]`);
+  if(!el) return;
+  const mode = currentEvent.inputMode;
+  el.classList.remove('sel-good','sel-bad');
+  if(dragValue===true){
+    if(mode==='good') el.classList.add('sel-good');
+    else              el.classList.add('sel-bad');
+  }
+}
+
+// ================================================================
+//  セットアップグリッド（招集者が選択可能時間帯を設定）
+// ================================================================
+function initSetupGrid() {
+  setupSlots = {};
+  setupWeek  = 0;
+  setupDates = candidateDates.length > 0 ? [...candidateDates] : (() => {
+    const today = formatDate(new Date());
+    const d = [];
+    for(let i=0;i<14;i++) d.push(addDays(today,i));
+    return d;
+  })();
+  renderSetupGrid();
+}
+
+function renderSetupGrid() {
+  const gridEl = document.getElementById('setup-grid');
+  if(!gridEl) return;
+  const dates = setupDates.slice(setupWeek*7, setupWeek*7+7);
+  if(!dates.length){ gridEl.innerHTML=''; return; }
+  gridEl.style.gridTemplateColumns = `52px repeat(${dates.length},1fr)`;
+
+  let html = `<div class="time-col-header">時刻</div>`;
+  dates.forEach(d=>{
+    const {label,wd,wdNum} = dateLabel(d);
+    const cls = wdNum===0?'sun':wdNum===6?'sat':'';
+    html += `<div class="day-header ${cls}">${label}<br><span class="wd">${wd}</span></div>`;
+  });
+  SLOTS.forEach(slot=>{
+    const isH = slot.endsWith(':00');
+    html += `<div class="time-label${isH?' h-start':''}">${slot}</div>`;
+    dates.forEach(d=>{
+      const key = `${d}_${slot}`;
+      const sel = setupSlots[key] ? ' avail-set' : '';
+      html += `<div class="slot${isH?' h-start':''}${sel}" data-key="${key}"
+        onmousedown="setupMD(event)" onmouseover="setupMO(event)"
+        ontouchstart="onTS(event)" ontouchmove="onTM(event)" ontouchend="setupTE(event)"
+      ></div>`;
+    });
+  });
+  gridEl.innerHTML = html;
+  const lbl = `${dateLabel(dates[0]).label} 〜 ${dateLabel(dates[dates.length-1]).label}`;
+  document.getElementById('setup-week-label').textContent = lbl;
+}
+
+let setupDragging=false, setupDragVal=null, setupTouched=new Set();
+function setupMD(e) {
+  e.preventDefault();
+  const key=e.currentTarget.dataset.key;
+  setupDragging=true; setupDragVal=!setupSlots[key];
+  setupTouched=new Set([key]); applySetupSlot(key);
+}
+function setupMO(e) {
+  if(!setupDragging) return;
+  const key=e.currentTarget.dataset.key;
+  if(!setupTouched.has(key)){ setupTouched.add(key); applySetupSlot(key); }
+}
+function setupTE(e) {
+  const el=e.currentTarget;
+  if(el._touchMoved) return;
+  const key=el.dataset.key;
+  setupDragVal=!setupSlots[key]; applySetupSlot(key);
+}
+document.addEventListener('mouseup',()=>{ setupDragging=false; setupTouched.clear(); });
+function applySetupSlot(key) {
+  if(setupDragVal) setupSlots[key]=true; else delete setupSlots[key];
+  const el=document.querySelector(`#setup-grid [data-key="${key}"]`);
+  if(el){ el.classList.toggle('avail-set', !!setupDragVal); }
+}
+function prevWeekSetup() { if(setupWeek>0){ setupWeek--; renderSetupGrid(); } }
+function nextWeekSetup() { if((setupWeek+1)*7<setupDates.length){ setupWeek++; renderSetupGrid(); } }
+function setupSelectAll() {
+  const dates=setupDates.slice(setupWeek*7,setupWeek*7+7);
+  dates.forEach(d=>SLOTS.forEach(s=>{ setupSlots[`${d}_${s}`]=true; }));
+  renderSetupGrid();
+}
+function setupClearAll() {
+  const dates=setupDates.slice(setupWeek*7,setupWeek*7+7);
+  dates.forEach(d=>SLOTS.forEach(s=>{ delete setupSlots[`${d}_${s}`]; }));
+  renderSetupGrid();
+}
+
+// ================================================================
+//  招集者専用ページ：URLパラメータ ?event=xxx&organizer=1 でアクセス
+// ================================================================
+function buildOrganizerUrl(id) {
+  return `${location.origin}${location.pathname}?event=${id}&organizer=1`;
+}
+
+// ================================================================
+//  週送り
+// ================================================================
+function prevWeek(mode) {
+  if(mode==='r')  { if(currentWeekR>0)  { currentWeekR--;   renderGrid('r');   } }
+  else            { if(currentWeekRes>0){ currentWeekRes--; renderGrid('res'); } }
+}
+function nextWeek(mode) {
+  const len = currentEvent?.dates?.length||0;
+  if(mode==='r')  { if((currentWeekR+1)*7  <len){ currentWeekR++;   renderGrid('r');   } }
+  else            { if((currentWeekRes+1)*7 <len){ currentWeekRes++; renderGrid('res'); } }
+}
+</script>
+</body>
+</html>
