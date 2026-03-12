@@ -123,14 +123,14 @@
   .time-label { background:var(--cream); font-family:'DM Mono',monospace; font-size:10px; padding:0 5px; display:flex; align-items:center; justify-content:flex-end; color:var(--muted); border-right:1.5px solid var(--border); border-bottom:1px dotted rgba(200,191,168,.4); min-height:26px; white-space:nowrap; }
   .time-label.h-start { border-top:1.5px solid var(--border); color:var(--ink); font-weight:600; }
 
-  .slot { min-height:26px; border-right:1px solid rgba(200,191,168,.35); border-bottom:1px dotted rgba(200,191,168,.35); cursor:pointer; transition:background .08s; position:relative; touch-action:none; }
+  .slot { min-height:26px; border-right:1px solid rgba(200,191,168,.35); border-bottom:1px dotted rgba(200,191,168,.35); cursor:pointer; transition:background .08s; position:relative; touch-action:pan-y; }
   .slot.h-start { border-top:1px solid rgba(200,191,168,.5); }
-  .slot:hover:not(.slot-disabled) { background:rgba(232,168,56,.18) !important; }
-  .touch-device .slot:hover { background:none !important; }
-  .slot.sel-good { background:rgba(58,125,68,.22); }
-  .slot.sel-bad  { background:rgba(200,75,49,.18); }
-  .slot.avail-set { background:rgba(45,95,166,.13); }
-  .slot.slot-disabled { background:rgba(200,191,168,.15); cursor:not-allowed; opacity:.5; }
+  /* ホバー色なし。クリック可能なスロットのみカーソル変化 */
+  .slot.slot-enabled { cursor:pointer; box-shadow:inset 0 0 0 1.5px rgba(45,95,166,.35); }
+  .slot.sel-good { background:rgba(58,125,68,.28); box-shadow:inset 0 0 0 1.5px rgba(58,125,68,.6); }
+  .slot.sel-bad  { background:rgba(200,75,49,.22); box-shadow:inset 0 0 0 1.5px rgba(200,75,49,.6); }
+  .slot.avail-set { background:rgba(45,95,166,.10); }
+  .slot.slot-disabled { background:rgba(200,191,168,.12); cursor:default; opacity:.4; }
   .organizer-badge { display:inline-block; background:var(--ink); color:var(--paper); font-size:11px; font-family:'DM Mono',monospace; padding:3px 10px; border-radius:3px; margin-bottom:10px; letter-spacing:.06em; }
 
   .slot.h0   { background:white; }
@@ -503,9 +503,8 @@ let allResponses   = [];
 const RESP_COLORS = ['#e57373','#64b5f6','#81c784','#ffb74d','#ba68c8','#4db6ac','#f06292','#aed581','#ff8a65','#90a4ae'];
 
 // ドラッグ状態
-let isDragging   = false;
+// クリック操作のみ（ドラッグ廃止）
 let dragValue    = null;
-let touchedSlots = new Set();
 
 // 招集者が設定する選択可能時間帯 { slotKey: true }
 let setupSlots   = {};
@@ -889,13 +888,15 @@ function renderGrid(mode) {
         // 選択可能スロット制限チェック
         const avail = ev.available_slots;
         const isDisabled = avail && Object.keys(avail).length > 0 && !avail[key];
-        if(isDisabled) cls+=' slot-disabled';
-        else {
+        if(isDisabled) {
+          cls+=' slot-disabled';
+        } else {
+          cls+=' slot-enabled';
           if(ev.inputMode==='good'&&v===true) cls+=' sel-good';
           if(ev.inputMode==='bad' &&v===true) cls+=' sel-bad';
         }
         html += `<div class="${cls}" data-key="${key}" data-disabled="${isDisabled?'1':''}"
-          onmousedown="onMD(event)" onmouseover="onMO(event)"
+          onclick="onSlotClick(event)"
           ontouchstart="onTS(event)" ontouchmove="onTM(event)" ontouchend="onTE(event)"
         ></div>`;
       } else {
@@ -930,8 +931,20 @@ function renderGrid(mode) {
 }
 
 // ================================================================
-//  タッチ操作（タップで所要時間分まとめてON/OFF）
+//  クリック／タップ操作（PC・スマホ共通：クリックで所要時間分トグル）
 // ================================================================
+
+// PC: クリック
+function onSlotClick(e) {
+  const el = e.currentTarget;
+  if(el.dataset.disabled==='1') return;
+  const key = el.dataset.key;
+  if(!key) return;
+  dragValue = draftSlots[key] !== true;
+  applySlotWithDuration(key);
+}
+
+// スマホ: タップ（スクロールと区別）
 let touchStartY = 0;
 function onTS(e) {
   touchStartY = e.touches[0].clientY;
@@ -946,27 +959,11 @@ function onTE(e) {
   const el = e.currentTarget;
   if(el._touchMoved) return;
   if(el.dataset.disabled==='1') return;
+  e.preventDefault(); // clickイベントの重複防止
   const key = el.dataset.key;
   if(!key) return;
   dragValue = draftSlots[key] !== true;
   applySlotWithDuration(key);
-}
-
-// マウスクリック時も所要時間分適用
-function onMD(e) {
-  e.preventDefault();
-  const el = e.currentTarget;
-  if(el.dataset.disabled==='1') return;
-  const key = el.dataset.key;
-  isDragging=true; dragValue=draftSlots[key]!==true;
-  touchedSlots=new Set([key]); applySlotWithDuration(key);
-}
-function onMO(e) {
-  if(!isDragging) return;
-  const el = e.currentTarget;
-  if(el.dataset.disabled==='1') return;
-  const key = el.dataset.key;
-  if(!touchedSlots.has(key)){ touchedSlots.add(key); applySlotWithDuration(key); }
 }
 
 // 所要時間分のスロットをまとめてON/OFF
