@@ -599,7 +599,7 @@ function copyShareUrl() {
   navigator.clipboard.writeText(url).then(()=>alert('参加者URLをコピーしました！'));
 }
 function copyOrgUrl() {
-  const url = currentEvent ? buildOrganizerUrl(currentEvent.id) : document.getElementById('share-org-url').textContent;
+  const url = currentEvent ? buildUrl(currentEvent.id) : '';
   navigator.clipboard.writeText(url).then(()=>alert('集計URLをコピーしました！'));
 }
 
@@ -697,7 +697,7 @@ async function submitCreateEvent() {
     currentEvent = { id, organizer, title, desc, duration, password, inputMode, dates, available_slots: hasSetup2 ? setupSlots : null };
     document.getElementById('share-url').textContent      = buildUrl(id);
     document.getElementById('share-password').textContent = password;
-    document.getElementById('share-org-url').textContent  = buildUrl(id) + ' （同じURL・集計タブから確認）';
+    // share-org-url は不要（URLは1本化済み）
     document.getElementById('view-created').style.display = 'block';
     document.getElementById('view-created').scrollIntoView({behavior:'smooth'});
   } catch(e) {
